@@ -7,9 +7,11 @@
 class Noncopyable {
  protected:
   Noncopyable() {}
+
   ~Noncopyable() {}
  private:
   Noncopyable(const Noncopyable &);
+
   Noncopyable &operator=(const Noncopyable &);
 };
 
@@ -55,7 +57,7 @@ class CPUDeviceAllocator : public DeviceAllocator {
 
 class Buffer : public Noncopyable {
  private:
-  size_t size_ = 0;
+  size_t byte_size_ = 0;
   void *ptr_ = nullptr;
   bool use_external_ = false;
   std::shared_ptr<DeviceAllocator> allocator_;
@@ -63,13 +65,13 @@ class Buffer : public Noncopyable {
  public:
   explicit Buffer() = default;
 
-  explicit Buffer(size_t size,
+  explicit Buffer(size_t byte_size,
                   std::shared_ptr<DeviceAllocator> allocator,
                   void *ptr = nullptr, bool use_external = false)
-      : size_(size), allocator_(allocator), ptr_(ptr), use_external_(use_external) {
+      : byte_size_(byte_size), allocator_(allocator), ptr_(ptr), use_external_(use_external) {
     if (!ptr_ && allocator_) {
       use_external_ = false;
-      ptr_ = allocator_->allocate(size);
+      ptr_ = allocator_->allocate(byte_size);
     }
   }
 
@@ -86,8 +88,8 @@ class Buffer : public Noncopyable {
     return ptr_;
   }
 
-  size_t get_size() const {
-    return size_;
+  size_t get_byte_size() const {
+    return byte_size_;
   }
 
   const void *get_ptr() const {
@@ -97,8 +99,6 @@ class Buffer : public Noncopyable {
 
 template<typename DataType>
 struct Tensor {
-  using DataType_ = DataType;
-
   explicit Tensor() = default;
 
   explicit Tensor(int32_t dim0) {
@@ -206,12 +206,12 @@ struct Tensor {
     return true;
   }
 
-  bool assign(std::shared_ptr<Buffer> buffer) {
+  bool assign(size_t size, std::shared_ptr<Buffer> buffer) {
     if (!buffer) {
       LOG(ERROR) << "The buffer parameter in the assign function is null pointer!";
       return false;
     }
-    size_ = buffer->get_size();
+    size_ = size;
     buffer_ = buffer;
     return true;
   }
@@ -241,10 +241,18 @@ T *Tensor<DataType>::ptr() {
 
 int main() {
   std::shared_ptr<DeviceAllocator> alloc = std::make_shared<CPUDeviceAllocator>();
-  float *a = static_cast<float *>(malloc(sizeof(float) * 3));
-  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>(3, alloc, a, false);
-  Tensor<float> tensor(3);
-  tensor.assign(buffer);
-  free(a);
+//  float *a = static_cast<float *>(malloc(sizeof(float) * 3));
+//  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>(3, alloc, a, false);
+//  Tensor<float> tensor(3);
+//  tensor.assign(buffer);
+//  free(a);
+
+  int n = 3;
+//  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>(n * sizeof(float), alloc, nullptr);
+//  Tensor<float> tensor;
+//  tensor.assign(3, buffer);
+
+  Tensor<float> t2(12);
+  t2.allocate(alloc);
   return 0;
 }
