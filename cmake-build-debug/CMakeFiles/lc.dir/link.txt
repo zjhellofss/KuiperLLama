@@ -1,1 +1,0 @@
-/usr/bin/c++ -g CMakeFiles/lc.dir/main.cpp.o -o lc  -Wl,-rpath,/usr/local/lib /usr/local/lib/libglog.so.0.7.0 
