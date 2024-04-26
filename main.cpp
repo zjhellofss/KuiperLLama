@@ -5,13 +5,19 @@
 
 #include "base/alloc.h"
 #include "base/buffer.h"
+#include "tensor/tensor.h"
 
 int main() {
-  std::shared_ptr<DeviceAllocator> alloc =
-      std::make_shared<CPUDeviceAllocator>();
-  float *a = static_cast<float *>(malloc(3 * sizeof(float)));
-  std::shared_ptr<Buffer> buffer =
-      std::make_shared<Buffer>(3 * sizeof(float), alloc, a, false);
-  free(a);
+  std::shared_ptr<CPUDeviceAllocator> alloc = std::make_shared<CPUDeviceAllocator>();
+  Tensor<float> tensor(1, 2, 3, 4);
+  tensor.allocate(alloc);
+  tensor.allocate(alloc, true);
+  tensor.allocate(alloc, false);
+
+  tensor.reset_dims({4, 5, 6});
+  tensor.allocate(alloc, false);
+
+  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>(481, alloc);
+  tensor.assign(buffer);
   return 0;
 }

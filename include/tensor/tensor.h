@@ -7,8 +7,9 @@
 
 #include "base/base.h"
 #include "base/buffer.h"
-template <typename DataType>
-struct Tensor {
+template<typename DataType>
+class Tensor {
+ public:
   explicit Tensor() = default;
 
   explicit Tensor(int32_t dim0);
@@ -19,41 +20,45 @@ struct Tensor {
 
   explicit Tensor(int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3);
 
-  explicit Tensor(std::vector<int32_t> shapes);
+  explicit Tensor(std::vector<int32_t> dims);
 
-  template <typename T>
+  template<typename T>
   T *ptr();
 
-  template <typename T>
+  template<typename T>
   const T *ptr() const;
 
   size_t size() const;
 
-  void set_size(size_t size);
+  size_t byte_size() const;
 
   int32_t dim_size() const;
 
-  int32_t get_dim(int32_t idx);
+  int32_t get_dim(int32_t idx) const;
 
-  void set_dim(int32_t idx, int32_t dim);
+  void reshape(const std::vector<int32_t> &dims);
 
   const std::vector<int32_t> &dims() const;
 
+  bool assign(std::shared_ptr<Buffer> buffer);
+
   void reset_dims(const std::vector<int32_t> &dims);
 
-  bool allocate(size_t size, std::shared_ptr<DeviceAllocator> allocator);
+  bool allocate(std::shared_ptr<DeviceAllocator> allocator, bool need_realloc = false);
 
-  bool allocate(std::shared_ptr<DeviceAllocator> allocator);
-
-  bool assign(size_t size, std::shared_ptr<Buffer> buffer);
-
+ private:
   size_t size_ = 0;
   std::vector<int32_t> dims_;
   std::shared_ptr<Buffer> buffer_;
 };
 
-template <typename DataType>
-template <typename T>
+template<typename DataType>
+size_t Tensor<DataType>::byte_size() const {
+  return this->size() * sizeof(DataType);
+}
+
+template<typename DataType>
+template<typename T>
 const T *Tensor<DataType>::ptr() const {
   if (!buffer_) {
     return nullptr;
@@ -61,8 +66,8 @@ const T *Tensor<DataType>::ptr() const {
   return const_cast<const T *>(reinterpret_cast<T *>(buffer_->get_ptr()));
 }
 
-template <typename DataType>
-template <typename T>
+template<typename DataType>
+template<typename T>
 T *Tensor<DataType>::ptr() {
   if (!buffer_) {
     return nullptr;
