@@ -57,6 +57,7 @@ bool Tensor::assign(std::shared_ptr<Buffer> buffer) {
 
   size_t byte_size = this->byte_size();
   if (byte_size != buffer->get_byte_size()) {
+    LOG(ERROR) << "The size of buffer is not equal to the tensor!";
     return false;
   }
   buffer_ = buffer;

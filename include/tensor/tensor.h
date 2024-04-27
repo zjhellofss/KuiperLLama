@@ -39,7 +39,7 @@ class Tensor {
 
   const std::vector<int32_t>& dims() const;
 
-   std::vector<size_t> strides() const;
+  std::vector<size_t> strides() const;
 
   bool assign(std::shared_ptr<Buffer> buffer);
 
