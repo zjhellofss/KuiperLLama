@@ -1,8 +1,7 @@
 #include <cstdlib>
-
 #include "base/alloc.h"
-CPUDeviceAllocator::CPUDeviceAllocator()
-    : DeviceAllocator(DeviceType::kDeviceCPU) {}
+CPUDeviceAllocator::CPUDeviceAllocator() : DeviceAllocator(DeviceType::kDeviceCPU) {
+}
 
 void* CPUDeviceAllocator::allocate(size_t size) {
   if (!size) {

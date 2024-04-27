@@ -1,10 +1,10 @@
 #ifndef LC_INCLUDE_TENSOR_TENSOR_H_
 #define LC_INCLUDE_TENSOR_TENSOR_H_
-#include <stddef.h>
 #include <memory>
 #include <vector>
 #include "base/base.h"
 #include "base/buffer.h"
+
 class Tensor {
  public:
   explicit Tensor() = default;
@@ -29,7 +29,7 @@ class Tensor {
 
   size_t byte_size() const;
 
-  int32_t dim_size() const;
+  int32_t dims_size() const;
 
   DataType data_type() const;
 
@@ -43,7 +43,7 @@ class Tensor {
 
   bool assign(std::shared_ptr<Buffer> buffer);
 
-  void reset_dims(const std::vector<int32_t>& dims);
+  void reset(DataType data_type, const std::vector<int32_t>& dims);
 
   bool allocate(std::shared_ptr<DeviceAllocator> allocator, bool need_realloc = false);
 
@@ -59,7 +59,7 @@ const T* Tensor::ptr() const {
   if (!buffer_) {
     return nullptr;
   }
-  return const_cast<const T*>(reinterpret_cast<T*>(buffer_->get_ptr()));
+  return const_cast<const T*>(reinterpret_cast<T*>(buffer_->ptr()));
 }
 
 template <typename T>
@@ -67,7 +67,7 @@ T* Tensor::ptr() {
   if (!buffer_) {
     return nullptr;
   }
-  return reinterpret_cast<T*>(buffer_->get_ptr());
+  return reinterpret_cast<T*>(buffer_->ptr());
 }
 
 #endif  // LC_INCLUDE_TENSOR_TENSOR_H_

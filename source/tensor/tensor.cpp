@@ -41,7 +41,9 @@ Tensor::Tensor(DataType data_type, std::vector<int32_t> dims)
   size_ = MultiplyAccumulate(dims.begin(), dims.end(), 1);
 }
 
-size_t Tensor::size() const { return this->size_; }
+size_t Tensor::size() const {
+  return this->size_;
+}
 
 int32_t Tensor::get_dim(int32_t idx) const {
   CHECK_GE(idx, 0);
@@ -56,7 +58,7 @@ bool Tensor::assign(std::shared_ptr<Buffer> buffer) {
   }
 
   size_t byte_size = this->byte_size();
-  if (byte_size != buffer->get_byte_size()) {
+  if (byte_size != buffer->byte_size()) {
     LOG(ERROR) << "The size of buffer is not equal to the tensor!";
     return false;
   }
@@ -77,38 +79,54 @@ bool Tensor::allocate(std::shared_ptr<DeviceAllocator> allocator, bool need_real
     return false;
   }
 
-  if (buffer_ && byte_size == buffer_->get_byte_size()) {
+  if (buffer_ && byte_size == buffer_->byte_size()) {
     if (!need_realloc) {
       return true;
     }
   }
 
   buffer_ = std::make_shared<Buffer>(byte_size, allocator, nullptr);
-  if (!buffer_->get_ptr()) {
+  if (!buffer_->ptr()) {
     LOG(ERROR) << "The memory allocated is a null pointer!";
     return false;
   }
   return true;
 }
 
-const std::vector<int32_t>& Tensor::dims() const { return this->dims_; }
-
-void Tensor::reset_dims(const std::vector<int32_t>& dims) {
-  this->dims_ = dims;
-  this->size_ = MultiplyAccumulate(dims.begin(), dims.end(), 1);
+const std::vector<int32_t>& Tensor::dims() const {
+  return this->dims_;
 }
 
-int32_t Tensor::dim_size() const { return static_cast<int32_t>(dims_.size()); }
+void Tensor::reset(DataType data_type, const std::vector<int32_t>& dims) {
+  this->data_type_ = data_type;
+  this->dims_ = dims;
+  this->size_ = MultiplyAccumulate(dims.begin(), dims.end(), 1);
+  this->buffer_ = nullptr;
+}
 
-DataType Tensor::data_type() const { return data_type_; }
+int32_t Tensor::dims_size() const {
+  return static_cast<int32_t>(dims_.size());
+}
+
+DataType Tensor::data_type() const {
+  return data_type_;
+}
 
 void Tensor::reshape(const std::vector<int32_t>& dims) {
   size_t size = MultiplyAccumulate(dims.begin(), dims.end(), 1);
-  CHECK_EQ(size, size_);
-  this->dims_ = dims;
+  if (buffer_ != nullptr && size == size_) {
+    this->dims_ = dims;
+  } else {
+    this->dims_ = dims;
+    this->size_ = size;
+    this->buffer_ = std::make_shared<Buffer>(size, buffer_->allocator());
+    CHECK(this->buffer_->allocate());
+  }
 }
 
-size_t Tensor::byte_size() const { return this->size() * DataTypeSize(data_type_); }
+size_t Tensor::byte_size() const {
+  return this->size() * DataTypeSize(data_type_);
+}
 
 std::vector<size_t> Tensor::strides() const {
   std::vector<size_t> strides;
