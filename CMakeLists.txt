@@ -10,7 +10,7 @@ aux_source_directory(./source/op/ DIR_OP)
 aux_source_directory(./source/model/ DIR_MODEL)
 
 add_executable(lc main.cpp ${DIR_TENSOR} ${DIR_ALLOC} ${DIR_BUFFER} ${DIR_OP} ${DIR_MODEL})
-
 target_link_libraries(lc glog::glog)
 target_include_directories(lc PUBLIC ${glog_INCLUDE_DIR})
 target_include_directories(lc PUBLIC ./include)
+target_link_libraries(lc sentencepiece)

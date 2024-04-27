@@ -12,6 +12,11 @@ enum class DataType : uint8_t {
   kDataTypeInt8 = 2,
 };
 
+enum class ModelType : uint8_t {
+  kModelTypeUnknown = 0,
+  kModelTypeLLama2 = 1,
+};
+
 inline size_t DataTypeSize(DataType data_type) {
   if (data_type == DataType::kDataTypeFp32) {
     return sizeof(float);
@@ -22,6 +27,14 @@ inline size_t DataTypeSize(DataType data_type) {
   }
 }
 
+enum class Status : uint8_t {
+  kSuccess = 0,
+  kFunctionUnImplement = 1,
+  kPathNotValid = 2,
+  kParamReadError = 3,
+  kWeightReadError = 4,
+};
+
 class Noncopyable {
  protected:
   Noncopyable() = default;
@@ -29,8 +42,8 @@ class Noncopyable {
   ~Noncopyable() = default;
 
  private:
-  Noncopyable(const Noncopyable &) = delete;
+  Noncopyable(const Noncopyable&) = delete;
 
-  Noncopyable &operator=(const Noncopyable &) = delete;
+  Noncopyable& operator=(const Noncopyable&) = delete;
 };
 #endif  // LC_INCLUDE_BASE_BASE_H_

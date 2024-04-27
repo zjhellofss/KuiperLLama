@@ -1,16 +1,29 @@
 #ifndef LC_INCLUDE_MODEL_MODEL_H_
 #define LC_INCLUDE_MODEL_MODEL_H_
 #include <string>
+#include "llama2_config.h"
+#include "op/layer.h"
+#include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
 
 class Model {
  public:
-  explicit Model(std::string token_path, std::string model_path);
+  explicit Model(ModelType model_type, std::string token_path, std::string model_path);
 
-  virtual void Init() = 0;
+  virtual Status init() = 0;
 
- private:
-  std::string token_path;
+  virtual Tensor forward(const std::vector<int>& tokens, int start_pos) = 0;
 
+  ModelType model_type() const;
+
+  const std::string& token_path() const;
+
+  const std::string& model_path() const;
+
+ protected:
+  ModelType model_type_;
+  std::string token_path_;
+  std::string model_path_;
+  std::unique_ptr<sentencepiece::SentencePieceProcessor> sentence_piece_processor_;
 };
 #endif  // LC_INCLUDE_MODEL_MODEL_H_

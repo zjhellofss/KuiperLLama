@@ -19,12 +19,12 @@ ParamLayerFp32::ParamLayerFp32(LayerType layer_type, std::string layer_name)
     : Layer(layer_type, DataType::kDataTypeFp32, std::move(layer_name)) {
 }
 
-LayerStatus ParamLayerFp32::Init() {
-  return LayerStatus::kFunctionUnImplement;
+Status ParamLayerFp32::init() {
+  return Status::kFunctionUnImplement;
 }
 
-LayerStatus ParamLayerFp32::Forward() {
-  return LayerStatus::kFunctionUnImplement;
+Status ParamLayerFp32::forward() {
+  return Status::kFunctionUnImplement;
 }
 
 void ParamLayerFp32::set_input(int32_t idx, const Tensor& input) {

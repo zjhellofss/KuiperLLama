@@ -1,23 +1,20 @@
 #include <glog/logging.h>
-
 #include <iostream>
 #include <memory>
-
 #include "base/alloc.h"
 #include "base/buffer.h"
 #include "tensor/tensor.h"
 
 int main() {
   std::shared_ptr<CPUDeviceAllocator> alloc = std::make_shared<CPUDeviceAllocator>();
-  Tensor<float> tensor(1, 2, 3, 4);
+  Tensor tensor(DataType::kDataTypeFp32, 1, 2, 3, 4);
   tensor.allocate(alloc);
-  tensor.allocate(alloc, true);
-  tensor.allocate(alloc, false);
+  tensor.allocate(alloc);
 
-  tensor.reset_dims({4, 5, 6});
-  tensor.allocate(alloc, false);
+  tensor.reset(DataType::kDataTypeFp32, {4, 5, 6});
+  tensor.allocate(alloc);
 
-  std::shared_ptr<Buffer> buffer = std::make_shared<Buffer>(481, alloc);
-  tensor.assign(buffer);
+  tensor.reshape({11, 12, 13});
+  const auto& strides = tensor.strides();
   return 0;
 }

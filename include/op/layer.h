@@ -9,11 +9,6 @@ enum class LayerType : uint8_t {
   kLayerLinear = 1,
 };
 
-enum class LayerStatus : uint8_t {
-  kForwardSuccess = 0,
-  kFunctionUnImplement = 1,
-};
-
 class Layer {
  public:
   explicit Layer(LayerType layer_type, DataType data_type, std::string layer_name = "");
@@ -22,9 +17,9 @@ class Layer {
 
   LayerType layer_type() const;
 
-  virtual LayerStatus Init() = 0;
+  virtual Status init() = 0;
 
-  virtual LayerStatus Forward() = 0;
+  virtual Status forward() = 0;
 
   virtual void set_input(int32_t idx, const Tensor& input) = 0;
 
@@ -52,9 +47,9 @@ class ParamLayerFp32 : public Layer {
  public:
   explicit ParamLayerFp32(LayerType layer_type, std::string layer_name = "");
 
-  LayerStatus Init() override;
+  Status init() override;
 
-  LayerStatus Forward() override;
+  Status forward() override;
 
   void set_input(int32_t idx, const Tensor& input) override;
 
