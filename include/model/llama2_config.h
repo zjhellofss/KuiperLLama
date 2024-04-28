@@ -1,5 +1,6 @@
 #ifndef LC_INCLUDE_MODEL_LLAMA_CONFIG_H_
 #define LC_INCLUDE_MODEL_LLAMA_CONFIG_H_
+namespace model {
 struct LlamaModelConfig {
   int32_t dim = 0;
   int32_t hidden_dim = 0;
@@ -9,4 +10,5 @@ struct LlamaModelConfig {
   int32_t vocab_size = 0;
   int32_t seq_len = 0;
 };
+}  // namespace model
 #endif  // LC_INCLUDE_MODEL_LLAMA_CONFIG_H_

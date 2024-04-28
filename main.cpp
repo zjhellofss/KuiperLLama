@@ -20,9 +20,10 @@ int main() {
 
   char* checkpoint_path = "/home/fss/big_model/llama2_7b.bin";  // e.g. out/model.bin
   char* tokenizer_path = "/home/fss/big_model/tokenizer.model";
-  LLamaModel model(tokenizer_path, checkpoint_path);
+  model::LLamaModel model(tokenizer_path, checkpoint_path);
   model.init();
   std::string sentence = "Hi everyone";
-  model.encode(sentence);
+  const auto& tokens = model.encode(sentence);
+  model.forward(tokens,0);
   return 0;
 }

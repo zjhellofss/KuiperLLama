@@ -1,5 +1,6 @@
 #include "base/buffer.h"
 
+namespace base {
 Buffer::Buffer(size_t byte_size, std::shared_ptr<DeviceAllocator> allocator, void* ptr,
                bool use_external)
     : byte_size_(byte_size), allocator_(allocator), ptr_(ptr), use_external_(use_external) {
@@ -47,3 +48,5 @@ bool Buffer::allocate() {
 std::shared_ptr<DeviceAllocator> Buffer::allocator() const {
   return allocator_;
 }
+
+}  // namespace base

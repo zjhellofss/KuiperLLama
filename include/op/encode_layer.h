@@ -2,7 +2,8 @@
 #define LC_INCLUDE_OP_ENCODE_LAYER_H_
 #include <sentencepiece_processor.h>
 #include "layer.h"
-class EncodeLayer : public LayerNoParam {
+namespace op {
+class EncodeLayer : public LayerFp32 {
  public:
   explicit EncodeLayer();
 
@@ -17,4 +18,5 @@ class EncodeLayer : public LayerNoParam {
   bool has_eos_ = false;
   std::unique_ptr<sentencepiece::SentencePieceProcessor> sentence_piece_processor_;
 };
+}  // namespace op
 #endif  // LC_INCLUDE_OP_ENCODE_LAYER_H_

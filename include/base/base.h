@@ -1,6 +1,7 @@
 #ifndef LC_INCLUDE_BASE_BASE_H_
 #define LC_INCLUDE_BASE_BASE_H_
 #include <cstdint>
+namespace base {
 enum class DeviceType : uint8_t {
   kDeviceUnknown = 0,
   kDeviceCPU = 1,
@@ -10,6 +11,7 @@ enum class DataType : uint8_t {
   kDataTypeUnknown = 0,
   kDataTypeFp32 = 1,
   kDataTypeInt8 = 2,
+  kDataTypeInt32 = 2,
 };
 
 enum class ModelType : uint8_t {
@@ -22,6 +24,8 @@ inline size_t DataTypeSize(DataType data_type) {
     return sizeof(float);
   } else if (data_type == DataType::kDataTypeInt8) {
     return sizeof(int8_t);
+  } else if (data_type == DataType::kDataTypeInt32) {
+    return sizeof(int32_t);
   } else {
     return 0;
   }
@@ -33,6 +37,7 @@ enum class Status : uint8_t {
   kPathNotValid = 2,
   kParamReadError = 3,
   kWeightReadError = 4,
+  kCreateLayerFailed = 5,
 };
 
 class Noncopyable {
@@ -46,4 +51,5 @@ class Noncopyable {
 
   Noncopyable& operator=(const Noncopyable&) = delete;
 };
+}  // namespace base
 #endif  // LC_INCLUDE_BASE_BASE_H_

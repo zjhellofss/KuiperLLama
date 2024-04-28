@@ -2,6 +2,7 @@
 #define LC_INCLUDE_BASE_BUFFER_H_
 #include <memory>
 #include "base/alloc.h"
+namespace base {
 class Buffer : public Noncopyable {
  private:
   size_t byte_size_ = 0;
@@ -27,5 +28,6 @@ class Buffer : public Noncopyable {
 
   std::shared_ptr<DeviceAllocator> allocator() const;
 };
+}  // namespace base
 
 #endif
