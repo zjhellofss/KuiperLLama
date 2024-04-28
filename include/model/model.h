@@ -2,6 +2,7 @@
 #define LC_INCLUDE_MODEL_MODEL_H_
 #include <string>
 #include "llama2_config.h"
+#include "op/encode_layer.h"
 #include "op/layer.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
@@ -24,6 +25,6 @@ class Model {
   ModelType model_type_;
   std::string token_path_;
   std::string model_path_;
-  std::unique_ptr<sentencepiece::SentencePieceProcessor> sentence_piece_processor_;
+  EncodeLayer encode_layer_;
 };
 #endif  // LC_INCLUDE_MODEL_MODEL_H_

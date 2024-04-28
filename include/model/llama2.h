@@ -14,7 +14,7 @@ struct LLamaRawModelData {
 
   const float* weight() const;
 
-  bool weight_is_valid(size_t peek) const;
+  bool is_weight_valid(size_t peek) const;
 };
 
 class LLamaModel : public Model {
@@ -22,6 +22,8 @@ class LLamaModel : public Model {
   explicit LLamaModel(std::string token_path, std::string model_path);
 
   Status init() override;
+
+  std::vector<int32_t> encode(const std::string& sentence);
 
   Tensor forward(const std::vector<int>& tokens, int start_pos) override;
 
@@ -31,6 +33,6 @@ class LLamaModel : public Model {
  private:
   int32_t vocab_size_ = 0;
   LlamaModelConfig config_;
+  std::unique_ptr<LayerNoParam> encode_layer_;
   std::unique_ptr<LLamaRawModelData> raw_model_data_;
-  std::vector<ParamLayerFp32> embedding_layers_;
 };

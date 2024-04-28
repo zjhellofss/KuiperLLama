@@ -24,7 +24,7 @@ const float* LLamaRawModelData::weight() const {
   return weight_data + current_offset;
 }
 
-bool LLamaRawModelData::weight_is_valid(size_t peek) const {
+bool LLamaRawModelData::is_weight_valid(size_t peek) const {
   if ((current_offset + peek) * sizeof(float) < file_size) {
     return true;
   } else {
@@ -41,18 +41,20 @@ Status LLamaModel::init() {
     return Status::kPathNotValid;
   }
 
-  sentence_piece_processor_ = std::make_unique<sentencepiece::SentencePieceProcessor>();
-  const auto& status = sentence_piece_processor_->Load(token_path_);
+  auto sentence_piece_processor = std::make_unique<sentencepiece::SentencePieceProcessor>();
+  const auto& status = sentence_piece_processor->Load(token_path_);
   if (!status.ok()) {
     LOG(ERROR) << "The tokenize model load failed, may be the path " << token_path_
                << " is not valid!";
     return Status::kPathNotValid;
   }
 
-  vocab_size_ = sentence_piece_processor_->GetPieceSize();
+  vocab_size_ = sentence_piece_processor->GetPieceSize();
   if (vocab_size_ <= 0) {
     return Status::kParamReadError;
   }
+
+  encode_layer_ = std::make_unique<EncodeLayer>(true, false, std::move(sentence_piece_processor));
   return read_model_file();
 }
 
@@ -104,4 +106,11 @@ Status LLamaModel::read_model_file() {
     return Status::kWeightReadError;
   }
   return Status::kSuccess;
+}
+
+std::vector<int32_t> LLamaModel::encode(const std::string& sentence) {
+  CHECK(encode_layer_ != nullptr);
+  EncodeLayer* encode_layer_ptr = dynamic_cast<EncodeLayer*>(encode_layer_.get());
+  CHECK(encode_layer_ptr != nullptr);
+  return encode_layer_ptr->encode(sentence);
 }

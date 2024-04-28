@@ -7,11 +7,12 @@
 enum class LayerType : uint8_t {
   kLayerUnknown = 0,
   kLayerLinear = 1,
+  kLayerEncode = 2,
 };
 
-class Layer {
+class BaseLayer {
  public:
-  explicit Layer(LayerType layer_type, DataType data_type, std::string layer_name = "");
+  explicit BaseLayer(LayerType layer_type, DataType data_type, std::string layer_name = "");
 
   DataType data_type() const;
 
@@ -29,10 +30,6 @@ class Layer {
 
   virtual Tensor get_output(int32_t idx) const = 0;
 
-  virtual void set_weight(int32_t idx, const Tensor& weight) = 0;
-
-  virtual Tensor get_weight(int32_t idx) const = 0;
-
   virtual void reset_input_size(size_t size) = 0;
 
   virtual void reset_output_size(size_t size) = 0;
@@ -43,9 +40,9 @@ class Layer {
   LayerType layer_type_ = LayerType::kLayerUnknown;
 };
 
-class ParamLayerFp32 : public Layer {
+class LayerNoParam : public BaseLayer {
  public:
-  explicit ParamLayerFp32(LayerType layer_type, std::string layer_name = "");
+  explicit LayerNoParam(LayerType layer_type, std::string layer_name = "");
 
   Status init() override;
 
@@ -59,20 +56,11 @@ class ParamLayerFp32 : public Layer {
 
   Tensor get_output(int32_t idx) const override;
 
-  void set_weight(int32_t idx, const Tensor& weight) override;
-
-  Tensor get_weight(int32_t idx) const override;
-
-  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
-
-  void reset_weight_size(size_t size);
-
   void reset_input_size(size_t size) override;
 
   void reset_output_size(size_t size) override;
 
  private:
-  std::vector<Tensor> weights_;
   std::vector<Tensor> inputs_;
   std::vector<Tensor> outputs_;
 };
