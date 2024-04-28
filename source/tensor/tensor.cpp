@@ -5,7 +5,7 @@
 namespace tensor {
 template <typename T, typename Tp>
 static inline size_t MultiplyAccumulate(T begin, T end, Tp init) {
-  if (begin == end) {
+  if (begin >= end) {
     return 0;
   }
   size_t size = std::accumulate(begin, end, init, std::multiplies<>());
