@@ -1,4 +1,5 @@
 #include "base/buffer.h"
+#include <glog/logging.h>
 
 namespace base {
 Buffer::Buffer(size_t byte_size, std::shared_ptr<DeviceAllocator> allocator, void* ptr,
@@ -47,6 +48,27 @@ bool Buffer::allocate() {
 
 std::shared_ptr<DeviceAllocator> Buffer::allocator() const {
   return allocator_;
+}
+
+void Buffer::copy_from(const Buffer& buffer) const {
+  CHECK(allocator_ != nullptr && buffer.allocator_ != nullptr);
+  CHECK(allocator_->device_type() == buffer.allocator_->device_type());
+
+  size_t copy_size = byte_size_ < buffer.byte_size_ ? byte_size_ : buffer.byte_size_;
+  return allocator_->memcpy(this->ptr_, buffer.ptr_, copy_size);
+}
+
+void Buffer::copy_from(const Buffer* buffer) const {
+  if (!buffer) {
+    return;
+  }
+  CHECK(allocator_ != nullptr && buffer->allocator_ != nullptr);
+  CHECK(allocator_->device_type() == buffer->allocator_->device_type());
+
+  size_t src_size = byte_size_;
+  size_t dest_size = buffer->byte_size_;
+  size_t copy_size = src_size < dest_size ? src_size : dest_size;
+  return allocator_->memcpy(buffer->ptr_, this->ptr_, copy_size);
 }
 
 }  // namespace base

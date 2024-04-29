@@ -3,7 +3,7 @@
 #include <memory>
 #include "base/alloc.h"
 namespace base {
-class Buffer : public Noncopyable {
+class Buffer : public NoCopyable {
  private:
   size_t byte_size_ = 0;
   void* ptr_ = nullptr;
@@ -19,6 +19,10 @@ class Buffer : public Noncopyable {
   virtual ~Buffer();
 
   bool allocate();
+
+  void copy_from(const Buffer& buffer) const;
+
+  void copy_from(const Buffer* buffer) const;
 
   void* ptr();
 

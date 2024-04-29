@@ -29,6 +29,10 @@ class BaseLayer {
 
   virtual void set_output(int32_t idx, const tensor::Tensor& output) = 0;
 
+  virtual size_t input_size() const = 0;
+
+  virtual size_t output_size() const = 0;
+
   virtual tensor::Tensor get_input(int32_t idx) const = 0;
 
   virtual tensor::Tensor get_output(int32_t idx) const = 0;
@@ -59,6 +63,10 @@ class LayerFp32 : public BaseLayer {
 
   tensor::Tensor get_output(int32_t idx) const override;
 
+  size_t input_size() const override;
+
+  size_t output_size() const override;
+
   void reset_input_size(size_t size) override;
 
   void reset_output_size(size_t size) override;
@@ -77,6 +85,8 @@ class LayerFp32Param : public LayerFp32 {
   tensor::Tensor get_weight(int32_t idx) const;
 
   void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
+
+  virtual size_t weight_size() const;
 
   void reset_weight_size(size_t size);
 

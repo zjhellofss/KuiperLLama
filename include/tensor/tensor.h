@@ -20,6 +20,8 @@ class Tensor {
 
   explicit Tensor(base::DataType data_type, std::vector<int32_t> dims);
 
+  bool is_empty() const;
+
   template <typename T>
   T* ptr();
 

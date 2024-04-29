@@ -11,7 +11,7 @@ enum class DataType : uint8_t {
   kDataTypeUnknown = 0,
   kDataTypeFp32 = 1,
   kDataTypeInt8 = 2,
-  kDataTypeInt32 = 2,
+  kDataTypeInt32 = 3,
 };
 
 enum class ModelType : uint8_t {
@@ -38,18 +38,22 @@ enum class Status : uint8_t {
   kParamReadError = 3,
   kWeightReadError = 4,
   kCreateLayerFailed = 5,
+  kKeyValueHasExist = 6,
+  kErrorInputSize = 7,
+  kErrorOutputSize = 8,
+  kErrorWeightSize = 9,
+  kErrorNullPointer = 10
 };
 
-class Noncopyable {
+class NoCopyable {
  protected:
-  Noncopyable() = default;
+  NoCopyable() = default;
 
-  ~Noncopyable() = default;
+  ~NoCopyable() = default;
 
- private:
-  Noncopyable(const Noncopyable&) = delete;
+  NoCopyable(const NoCopyable&) = delete;
 
-  Noncopyable& operator=(const Noncopyable&) = delete;
+  NoCopyable& operator=(const NoCopyable&) = delete;
 };
 }  // namespace base
 #endif  // LC_INCLUDE_BASE_BASE_H_

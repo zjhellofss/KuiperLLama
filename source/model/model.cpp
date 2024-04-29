@@ -17,5 +17,4 @@ const std::string& Model::token_path() const {
 const std::string& Model::model_path() const {
   return model_path_;
 }
-
 }  // namespace model

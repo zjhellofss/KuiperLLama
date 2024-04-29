@@ -118,14 +118,21 @@ base::DataType Tensor::data_type() const {
 
 void Tensor::reshape(const std::vector<int32_t>& dims) {
   size_t size = MultiplyAccumulate(dims.begin(), dims.end(), 1);
-  if (buffer_ != nullptr && size == size_) {
-    this->dims_ = dims;
-  } else {
+  if (!buffer_) {
     this->dims_ = dims;
     this->size_ = size;
-    this->buffer_ = std::make_shared<base::Buffer>(size, buffer_->allocator());
-    CHECK(this->buffer_->allocate());
+    return;
   }
+
+  if (size != size_) {
+    auto new_buffer = std::make_shared<base::Buffer>(size * base::DataTypeSize(this->data_type_),
+                                                     buffer_->allocator());
+    CHECK(new_buffer->allocate());
+    new_buffer->copy_from(buffer_.get());
+    this->buffer_ = new_buffer;
+  }
+  this->dims_ = dims;
+  this->size_ = size;
 }
 
 size_t Tensor::byte_size() const {
@@ -142,6 +149,10 @@ std::vector<size_t> Tensor::strides() const {
     strides.push_back(1);
   }
   return strides;
+}
+
+bool Tensor::is_empty() const {
+  return size_ == 0 || buffer_ == nullptr;
 }
 
 }  // namespace tensor

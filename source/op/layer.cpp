@@ -60,6 +60,14 @@ void LayerFp32::reset_output_size(size_t size) {
   outputs_.resize(size);
 }
 
+size_t LayerFp32::input_size() const {
+  return inputs_.size();
+}
+
+size_t LayerFp32::output_size() const {
+  return outputs_.size();
+}
+
 LayerFp32Param::LayerFp32Param(LayerType layer_type, std::string layer_name)
     : LayerFp32(layer_type, std::move(layer_name)) {
 }
@@ -93,6 +101,10 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
 
 void LayerFp32Param::reset_weight_size(size_t size) {
   weights_.resize(size);
+}
+
+size_t LayerFp32Param::weight_size() const {
+  return weights_.size();
 }
 
 }  // namespace op
