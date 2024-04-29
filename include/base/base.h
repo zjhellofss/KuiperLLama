@@ -39,10 +39,9 @@ enum class Status : uint8_t {
   kWeightReadError = 4,
   kCreateLayerFailed = 5,
   kKeyValueHasExist = 6,
-  kErrorInputSize = 7,
-  kErrorOutputSize = 8,
-  kErrorWeightSize = 9,
-  kErrorNullPointer = 10
+  kInferErrorInput = 7,
+  kInferErrorOutput = 8,
+  kInferErrorWeight = 9,
 };
 
 class NoCopyable {

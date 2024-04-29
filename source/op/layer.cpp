@@ -1,76 +1,77 @@
 #include "op/layer.h"
+
 #include <glog/logging.h>
+
 #include <numeric>
 #include <utility>
 
 namespace op {
-BaseLayer::BaseLayer(LayerType layer_type, base::DataType data_type, std::string layer_name)
-    : layer_type_(layer_type), data_type_(data_type), layer_name_(std::move(layer_name)) {
-}
+BaseLayer::BaseLayer(LayerType layer_type, base::DataType data_type,
+                     std::string layer_name)
+    : layer_type_(layer_type),
+      data_type_(data_type),
+      layer_name_(std::move(layer_name)) {}
 
-base::DataType BaseLayer::data_type() const {
-  return data_type_;
-}
+base::DataType BaseLayer::data_type() const { return data_type_; }
 
-LayerType BaseLayer::layer_type() const {
-  return layer_type_;
-}
+LayerType BaseLayer::layer_type() const { return layer_type_; }
 
-LayerFp32::LayerFp32(LayerType layer_type, std::string layer_name)
-    : BaseLayer(layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
-}
+Layer::Layer(LayerType layer_type, std::string layer_name)
+    : BaseLayer(layer_type, base::DataType::kDataTypeFp32,
+                std::move(layer_name)) {}
 
-base::Status LayerFp32::init() {
-  return base::Status::kFunctionUnImplement;
-}
+base::Status Layer::init() { return base::Status::kFunctionUnImplement; }
 
-base::Status LayerFp32::forward() {
-  return base::Status::kFunctionUnImplement;
-}
+base::Status Layer::forward() { return base::Status::kFunctionUnImplement; }
 
-void LayerFp32::set_input(int32_t idx, const tensor::Tensor& input) {
+void Layer::set_input(int32_t idx, const tensor::Tensor& input) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, inputs_.size());
   this->inputs_.at(idx) = input;
 }
 
-void LayerFp32::set_output(int32_t idx, const tensor::Tensor& output) {
+void Layer::set_output(int32_t idx, const tensor::Tensor& output) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, outputs_.size());
   this->outputs_.at(idx) = output;
 }
 
-tensor::Tensor LayerFp32::get_input(int32_t idx) const {
+const tensor::Tensor& Layer::get_input(int32_t idx) const {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, inputs_.size());
   return inputs_.at(idx);
 }
 
-tensor::Tensor LayerFp32::get_output(int32_t idx) const {
+tensor::Tensor& Layer::get_input(int32_t idx) {
+  CHECK_GE(idx, 0);
+  CHECK_LT(idx, inputs_.size());
+  return inputs_.at(idx);
+}
+
+tensor::Tensor& Layer::get_output(int32_t idx) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, outputs_.size());
   return outputs_.at(idx);
 }
 
-void LayerFp32::reset_input_size(size_t size) {
-  inputs_.resize(size);
+base::Status Layer::check() { return base::Status::kSuccess; }
+
+const tensor::Tensor& Layer::get_output(int32_t idx) const {
+  CHECK_GE(idx, 0);
+  CHECK_LT(idx, outputs_.size());
+  return outputs_.at(idx);
 }
 
-void LayerFp32::reset_output_size(size_t size) {
-  outputs_.resize(size);
-}
+void Layer::reset_input_size(size_t size) { inputs_.resize(size); }
 
-size_t LayerFp32::input_size() const {
-  return inputs_.size();
-}
+void Layer::reset_output_size(size_t size) { outputs_.resize(size); }
 
-size_t LayerFp32::output_size() const {
-  return outputs_.size();
-}
+size_t Layer::input_size() const { return inputs_.size(); }
+
+size_t Layer::output_size() const { return outputs_.size(); }
 
 LayerFp32Param::LayerFp32Param(LayerType layer_type, std::string layer_name)
-    : LayerFp32(layer_type, std::move(layer_name)) {
-}
+    : Layer(layer_type, std::move(layer_name)) {}
 
 void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
   CHECK_GE(idx, 0);
@@ -79,7 +80,7 @@ void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
   weights_.at(idx) = weight;
 }
 
-tensor::Tensor LayerFp32Param::get_weight(int32_t idx) const {
+const tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) const {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   return weights_.at(idx);
@@ -90,7 +91,8 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
 
-  size_t size = std::accumulate(dims.begin(), dims.end(), sizeof(float), std::multiplies<>());
+  size_t size = std::accumulate(dims.begin(), dims.end(), sizeof(float),
+                                std::multiplies<>());
   std::shared_ptr<base::Buffer> buffer =
       std::make_shared<base::Buffer>(size, nullptr, (void*)(weight_ptr), true);
 
@@ -99,12 +101,14 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
   weights_.at(idx) = weight;
 }
 
-void LayerFp32Param::reset_weight_size(size_t size) {
-  weights_.resize(size);
-}
+void LayerFp32Param::reset_weight_size(size_t size) { weights_.resize(size); }
 
-size_t LayerFp32Param::weight_size() const {
-  return weights_.size();
+size_t LayerFp32Param::weight_size() const { return weights_.size(); }
+
+tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {
+  CHECK_GE(idx, 0);
+  CHECK_LT(idx, weights_.size());
+  return weights_.at(idx);
 }
 
 }  // namespace op

@@ -33,9 +33,13 @@ class BaseLayer {
 
   virtual size_t output_size() const = 0;
 
-  virtual tensor::Tensor get_input(int32_t idx) const = 0;
+  virtual tensor::Tensor& get_input(int32_t idx) = 0;
 
-  virtual tensor::Tensor get_output(int32_t idx) const = 0;
+  virtual tensor::Tensor& get_output(int32_t idx) = 0;
+
+  virtual const tensor::Tensor& get_input(int32_t idx) const = 0;
+
+  virtual const tensor::Tensor& get_output(int32_t idx) const = 0;
 
   virtual void reset_input_size(size_t size) = 0;
 
@@ -47,21 +51,27 @@ class BaseLayer {
   LayerType layer_type_ = LayerType::kLayerUnknown;
 };
 
-class LayerFp32 : public BaseLayer {
+class Layer : public BaseLayer {
  public:
-  explicit LayerFp32(LayerType layer_type, std::string layer_name = "");
+  explicit Layer(LayerType layer_type, std::string layer_name = "");
 
   base::Status init() override;
 
   base::Status forward() override;
 
+  virtual base::Status check();
+
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 
   void set_output(int32_t idx, const tensor::Tensor& output) override;
 
-  tensor::Tensor get_input(int32_t idx) const override;
+  const tensor::Tensor& get_input(int32_t idx) const override;
 
-  tensor::Tensor get_output(int32_t idx) const override;
+  const tensor::Tensor& get_output(int32_t idx) const override;
+
+  tensor::Tensor& get_input(int32_t idx);
+
+  tensor::Tensor& get_output(int32_t idx);
 
   size_t input_size() const override;
 
@@ -76,13 +86,15 @@ class LayerFp32 : public BaseLayer {
   std::vector<tensor::Tensor> outputs_;
 };
 
-class LayerFp32Param : public LayerFp32 {
+class LayerFp32Param : public Layer {
  public:
   explicit LayerFp32Param(LayerType layer_type, std::string layer_name = "");
 
   void set_weight(int32_t idx, const tensor::Tensor& weight);
 
-  tensor::Tensor get_weight(int32_t idx) const;
+  const tensor::Tensor& get_weight(int32_t idx) const;
+
+  tensor::Tensor& get_weight(int32_t idx);
 
   void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
 

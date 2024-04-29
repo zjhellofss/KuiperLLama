@@ -7,6 +7,8 @@ class EmbeddingLayer : public LayerFp32Param {
  public:
   explicit EmbeddingLayer();
 
+  base::Status check() override;
+
   base::Status forward() override;
 };
 }  // namespace op

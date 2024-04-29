@@ -3,7 +3,7 @@
 #include <sentencepiece_processor.h>
 #include "layer.h"
 namespace op {
-class EncodeLayer : public LayerFp32 {
+class EncodeLayer : public Layer {
  public:
   explicit EncodeLayer();
 
