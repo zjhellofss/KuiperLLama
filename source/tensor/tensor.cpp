@@ -1,7 +1,5 @@
 #include "tensor/tensor.h"
-
 #include <glog/logging.h>
-
 #include <numeric>
 
 namespace tensor {
@@ -19,15 +17,13 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0) : data_type_(data_type) {
   size_ = dim0;
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1)
-    : data_type_(data_type) {
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1) : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
   size_ = dim0 * dim1;
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
-               int32_t dim2)
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
@@ -35,8 +31,7 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
   size_ = dim0 * dim1 * dim2;
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
-               int32_t dim2, int32_t dim3)
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
@@ -50,7 +45,9 @@ Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
   size_ = MultiplyAccumulate(dims_.begin(), dims_.end(), 1);
 }
 
-size_t Tensor::size() const { return this->size_; }
+size_t Tensor::size() const {
+  return this->size_;
+}
 
 int32_t Tensor::get_dim(int32_t idx) const {
   CHECK_GE(idx, 0);
@@ -67,8 +64,7 @@ base::DeviceType Tensor::device_type() const {
 
 bool Tensor::assign(std::shared_ptr<base::Buffer> buffer) {
   if (!buffer) {
-    LOG(ERROR)
-        << "The buffer parameter in the assign function is null pointer!";
+    LOG(ERROR) << "The buffer parameter in the assign function is null pointer!";
     return false;
   }
 
@@ -81,8 +77,7 @@ bool Tensor::assign(std::shared_ptr<base::Buffer> buffer) {
   return true;
 }
 
-bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator,
-                      bool need_realloc) {
+bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool need_realloc) {
   if (!allocator) {
     LOG(ERROR) << "The allocator parameter in the allocate function is null "
                   "pointer!";
@@ -91,8 +86,7 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator,
 
   size_t byte_size = this->byte_size();
   if (!byte_size) {
-    LOG(ERROR)
-        << "The byte_size parameter in the allocate function is equal to zero!";
+    LOG(ERROR) << "The byte_size parameter in the allocate function is equal to zero!";
     return false;
   }
 
@@ -110,7 +104,9 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator,
   return true;
 }
 
-const std::vector<int32_t>& Tensor::dims() const { return this->dims_; }
+const std::vector<int32_t>& Tensor::dims() const {
+  return this->dims_;
+}
 
 void Tensor::set_device_type(base::DeviceType device_type) {
   if (buffer_) {
@@ -125,9 +121,13 @@ void Tensor::reset(base::DataType data_type, const std::vector<int32_t>& dims) {
   this->buffer_ = nullptr;
 }
 
-int32_t Tensor::dims_size() const { return static_cast<int32_t>(dims_.size()); }
+int32_t Tensor::dims_size() const {
+  return static_cast<int32_t>(dims_.size());
+}
 
-base::DataType Tensor::data_type() const { return data_type_; }
+base::DataType Tensor::data_type() const {
+  return data_type_;
+}
 
 void Tensor::reshape(const std::vector<int32_t>& dims) {
   size_t size = MultiplyAccumulate(dims.begin(), dims.end(), 1);
@@ -138,8 +138,8 @@ void Tensor::reshape(const std::vector<int32_t>& dims) {
   }
 
   if (size != size_) {
-    auto new_buffer = std::make_shared<base::Buffer>(
-        size * base::DataTypeSize(this->data_type_), buffer_->allocator());
+    auto new_buffer = std::make_shared<base::Buffer>(size * base::DataTypeSize(this->data_type_),
+                                                     buffer_->allocator());
     CHECK(new_buffer->allocate());
     new_buffer->copy_from(buffer_.get());
     this->buffer_ = new_buffer;
@@ -164,6 +164,8 @@ std::vector<size_t> Tensor::strides() const {
   return strides;
 }
 
-bool Tensor::is_empty() const { return size_ == 0 || buffer_ == nullptr; }
+bool Tensor::is_empty() const {
+  return size_ == 0 || buffer_ == nullptr;
+}
 
 }  // namespace tensor

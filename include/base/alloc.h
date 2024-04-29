@@ -16,7 +16,7 @@ class DeviceAllocator {
 
   virtual void* allocate(size_t size) const = 0;
 
-  virtual void memcpy(void* src_ptr, void* dest_ptr, size_t size) const = 0;
+  virtual void memcpy(const void* src_ptr, void* dest_ptr, size_t size) const = 0;
 
  private:
   DeviceType device_type_ = DeviceType::kDeviceUnknown;
@@ -30,7 +30,7 @@ class CPUDeviceAllocator : public DeviceAllocator {
 
   void release(void* ptr) const override;
 
-  void memcpy(void* src_ptr, void* dest_ptr, size_t size) const override;
+  void memcpy(const void* src_ptr, void* dest_ptr, size_t size) const override;
 };
 
 class CPUDeviceAllocatorFactory {

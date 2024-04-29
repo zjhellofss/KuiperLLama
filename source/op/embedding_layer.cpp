@@ -1,9 +1,8 @@
 #include "op/embedding_layer.h"
-
 #include "op/layer.h"
 namespace op {
-EmbeddingLayer::EmbeddingLayer()
-    : LayerFp32Param(LayerType::kLayerEncode, "Embedding") {}
+EmbeddingLayer::EmbeddingLayer() : LayerFp32Param(LayerType::kLayerEncode, "Embedding") {
+}
 
 base::Status EmbeddingLayer::check() {
   if (this->input_size() != 2) {
@@ -63,21 +62,21 @@ base::Status EmbeddingLayer::forward() {
     return status;
   }
 
-  const int32_t* input_ptr = get_input(0).ptr<int32_t>();
+  const auto& input_tensor = get_input(0);
   const int32_t input_num = static_cast<int32_t>(get_input(1).size());
 
   const auto& weight_tensor = get_weight(0);
-  const float* weight_ptr = weight_tensor.ptr<float>();
+  const int32_t weight_dim = weight_tensor.get_dim(1);
+  const auto& output_tensor = get_output(0);
 
-  const int32_t dim = weight_tensor.get_dim(1);
-  const float* output_ptr = get_output(0).ptr<float>();
   const auto allocator = base::CPUDeviceAllocatorFactory::get_instance();
   for (int32_t i = 0; i < input_num; ++i) {
-    int32_t token = *(input_ptr + i);
-    const float* content_row = weight_ptr + token * dim;
-    allocator->memcpy((void*)content_row, (void*)(output_ptr + i * dim),
-                      dim * sizeof(float));
+    int32_t token = *input_tensor.index<int32_t>(i);
+    allocator->memcpy((void*)weight_tensor.index<float>(token * weight_dim),
+                      (void*)output_tensor.index<float>(i * weight_dim),
+                      weight_dim * sizeof(float));
   }
+  const float* output_ptr = output_tensor.ptr<float>();
   return base::Status::kSuccess;
 }
 }  // namespace op

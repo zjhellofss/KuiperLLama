@@ -18,8 +18,7 @@ void CPUDeviceAllocator::release(void* ptr) const {
     free(ptr);
   }
 }
-
-void CPUDeviceAllocator::memcpy(void* src_ptr, void* dest_ptr, size_t size) const {
+void CPUDeviceAllocator::memcpy(const void* src_ptr, void* dest_ptr, size_t size) const {
   std::memcpy(dest_ptr, src_ptr, size);
 }
 
