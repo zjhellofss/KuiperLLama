@@ -144,7 +144,8 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
 }
 
 op::EmbeddingLayer* LLama2Model::create_embedding_layer() {
-  op::EmbeddingLayer* embedding_layer = new op::EmbeddingLayer();
+  op::EmbeddingLayer* embedding_layer =
+      new op::EmbeddingLayer(config_->dim, config_->seq_len, std::abs(config_->vocab_size));
   const float* weight_embedding = raw_model_data_->weight(0);
   embedding_layer->reset_weight_size(1);
   embedding_layer->reset_input_size(2);
