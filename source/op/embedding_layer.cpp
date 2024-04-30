@@ -5,7 +5,7 @@ EmbeddingLayer::EmbeddingLayer(int32_t dim, int32_t seq_len, int32_t vocab_size)
     : dim_(dim),
       seq_len_(seq_len),
       vocab_size_(vocab_size),
-      LayerFp32Param(LayerType::kLayerEncode, "Embedding") {
+      LayerFp32Param(LayerType::kLayerEmbedding, "Embedding") {
 }
 
 base::Status EmbeddingLayer::check() {
@@ -88,14 +88,20 @@ base::Status EmbeddingLayer::forward() {
   const auto& output_tensor = get_output(0);
 
   const auto allocator = base::CPUDeviceAllocatorFactory::get_instance();
+  if (!allocator) {
+    return base::error::InternalError("Get the memory allocator failed.");
+  }
   for (int32_t i = 0; i < input_num; ++i) {
     int32_t token = *input_tensor.index<int32_t>(i);
     if (token > vocab_size_) {
       return base::error::InternalError("Token is greater than vocab size.");
     }
-    allocator->memcpy((void*)weight_tensor.index<float>(token * weight_dim),
-                      (void*)output_tensor.index<float>(i * weight_dim),
-                      weight_dim * sizeof(float));
+    void* dest_ptr = (void*)output_tensor.index<float>(i * weight_dim);
+    const void* src_ptr = (void*)weight_tensor.index<float>(token * weight_dim);
+    if (!dest_ptr || !src_ptr) {
+      return base::error::InternalError("Invalid src or dest pointer.");
+    }
+    allocator->memcpy(src_ptr, dest_ptr, weight_dim * sizeof(float));
   }
   return base::StatusCode::kSuccess;
 }

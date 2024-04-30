@@ -16,6 +16,14 @@ LayerType BaseLayer::layer_type() const {
   return layer_type_;
 }
 
+const std::string& BaseLayer::get_layer_name() const {
+  return layer_name_;
+}
+
+void BaseLayer::set_layer_name(const std::string& layer_name) {
+  layer_name_ = layer_name;
+}
+
 Layer::Layer(LayerType layer_type, std::string layer_name)
     : BaseLayer(layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
 }

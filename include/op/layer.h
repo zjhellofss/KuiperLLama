@@ -11,6 +11,7 @@ enum class LayerType : uint8_t {
   kLayerLinear = 1,
   kLayerEncode = 2,
   kLayerEmbedding = 3,
+  kLayerRMSNorm = 4,
 };
 
 class BaseLayer {
@@ -44,6 +45,10 @@ class BaseLayer {
   virtual void reset_input_size(size_t size) = 0;
 
   virtual void reset_output_size(size_t size) = 0;
+
+  const std::string& get_layer_name() const;
+
+  void set_layer_name(const std::string& layer_name);
 
  private:
   std::string layer_name_;

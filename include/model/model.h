@@ -6,6 +6,7 @@
 #include "op/embedding_layer.h"
 #include "op/encode_layer.h"
 #include "op/layer.h"
+#include "op/rmsnorm_layer.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
 
@@ -13,6 +14,7 @@ namespace model {
 enum class ModelBufferIdx {
   kInputTokens = 0,
   kInputEmbeddings = 1,
+  kOutputRMSNorm = 2,
 };
 
 class Model {
@@ -32,9 +34,11 @@ class Model {
  private:
   virtual void init_mem() = 0;
 
-  virtual base::Status read_model_file() = 0;
+  virtual base::Status gen_model_from_file() = 0;
 
-  virtual op::EmbeddingLayer* create_embedding_layer() = 0;
+  virtual void create_embedding_layer() = 0;
+
+  virtual void create_rmsnorm_layer() = 0;
 
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
 
@@ -51,6 +55,7 @@ class Model {
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
   std::map<ModelBufferIdx, tensor::Tensor> buffers_;
   std::unique_ptr<op::EncodeLayer> encode_layer_;
+  std::vector<std::unique_ptr<op::RmsNormLayer>> rmsnorm_layers_;
   std::unique_ptr<op::EmbeddingLayer> embedding_layer_;
 };
 }  // namespace model

@@ -54,7 +54,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   encode_layer_ =
       std::make_unique<op::EncodeLayer>(true, false, std::move(sentence_piece_processor));
 
-  Status read_status = read_model_file();
+  Status read_status = gen_model_from_file();
   if (!read_status) {
     return read_status;
   }
@@ -89,10 +89,38 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int start_pos)
                                  embedding_status.get_err_msg());
     return embedding_status;
   }
+
+  if (rmsnorm_layers_.size() != config_->layer_num) {
+    return base::error::InternalError("The model has a wrong size of attn_rmsnorm layers!");
+  }
+
+  auto rms_output = get_buffer(ModelBufferIdx::kOutputRMSNorm);
+  if (rms_output.is_empty()) {
+    return base::error::InternalError("The rms output tensor is empty!");
+  }
+  for (int32_t i = 0; i < tokens.size(); ++i) {
+    int32_t dim = config_->dim;
+    std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+        dim * sizeof(float), nullptr, input_embeddings.index<float>(i * dim), true);
+    tensor::Tensor rms_input(base::DataType::kDataTypeFp32, dim);
+    rms_input.assign(buffer);
+    rms_input.set_device_type(device_type_);
+
+    for (int32_t j = 0; j < config_->layer_num; ++j) {
+      if (j == 11) {
+        int k = 3;
+      }
+      const auto& attn_norm_layer = rmsnorm_layers_.at(j);
+      attn_norm_layer->set_input(0, rms_input);
+      attn_norm_layer->set_output(0, rms_output);
+      attn_norm_layer->forward();
+    }
+  }
+
   return base::error::Success();
 }
 
-base::Status LLama2Model::read_model_file() {
+base::Status LLama2Model::gen_model_from_file() {
   using namespace base;
   FILE* file = fopen(model_path_.data(), "rb");
   if (!file) {
@@ -135,11 +163,15 @@ base::Status LLama2Model::read_model_file() {
                                   " into memory, the pointer to weight start address is null");
   }
 
-  auto embedding_layer = create_embedding_layer();
-  if (!embedding_layer) {
+  create_embedding_layer();
+  if (!embedding_layer_) {
     return error::InternalError("Create the embedding layer failed!");
   }
-  embedding_layer_ = std::unique_ptr<op::EmbeddingLayer>(embedding_layer);
+
+  create_rmsnorm_layer();
+  if (rmsnorm_layers_.size() != config_->layer_num) {
+    return error::InternalError("Create the rmsnorm layer failed!");
+  }
   return error::Success();
 }
 
@@ -148,17 +180,36 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
   return encode_layer_->encode(sentence);
 }
 
-op::EmbeddingLayer* LLama2Model::create_embedding_layer() {
-  op::EmbeddingLayer* embedding_layer =
-      new op::EmbeddingLayer(config_->dim, config_->seq_len, std::abs(config_->vocab_size));
+void LLama2Model::create_embedding_layer() {
+  embedding_layer_ = std::make_unique<op::EmbeddingLayer>(config_->dim, config_->seq_len,
+                                                          std::abs(config_->vocab_size));
 
   const float* weight_embedding = raw_model_data_->weight(0);
-  embedding_layer->reset_weight_size(1);
-  embedding_layer->reset_input_size(2);
-  embedding_layer->reset_output_size(1);
-  embedding_layer->set_weight(0, {std::abs(vocab_size_), config_->dim}, weight_embedding);
-  embedding_layer->get_weight(0).set_device_type(device_type_);
-  return embedding_layer;
+  embedding_layer_->reset_weight_size(1);
+  embedding_layer_->reset_input_size(2);
+  embedding_layer_->reset_output_size(1);
+  embedding_layer_->set_weight(0, {std::abs(vocab_size_), config_->dim}, weight_embedding);
+  embedding_layer_->get_weight(0).set_device_type(device_type_);
+}
+
+void LLama2Model::create_rmsnorm_layer() {
+  int32_t layer_num = config_->layer_num;
+  int32_t rmsnorm_pos = config_->dim * std::abs(config_->vocab_size);
+
+  for (int32_t i = 0; i < layer_num; ++i) {
+    std::unique_ptr<op::RmsNormLayer> rms_norm_layer =
+        std::make_unique<op::RmsNormLayer>(config_->dim);
+    rms_norm_layer->reset_input_size(1);
+    rms_norm_layer->reset_output_size(1);
+    rms_norm_layer->reset_weight_size(1);
+
+    const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
+    rms_norm_layer->set_weight(0, {config_->dim}, weight_rmsnorm);
+    rms_norm_layer->get_weight(0).set_device_type(device_type_);
+    rmsnorm_layers_.push_back(std::move(rms_norm_layer));
+
+    rmsnorm_pos += config_->dim;
+  }
 }
 
 void LLama2Model::init_mem() {
@@ -175,6 +226,10 @@ void LLama2Model::init_mem() {
   input_embeddings.allocate(alloc);
   CHECK(insert_buffer(ModelBufferIdx::kInputTokens, input_tokens));
   CHECK(insert_buffer(ModelBufferIdx::kInputEmbeddings, input_embeddings));
+
+  tensor::Tensor rms_output(base::DataType::kDataTypeFp32, config_->dim);
+  rms_output.allocate(alloc);
+  CHECK(insert_buffer(ModelBufferIdx::kOutputRMSNorm, rms_output));
 }
 
 base::Status LLama2Model::insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) {

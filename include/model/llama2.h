@@ -31,9 +31,11 @@ class LLama2Model : public Model {
  private:
   void init_mem() override;
 
-  base::Status read_model_file() override;
+  base::Status gen_model_from_file() override;
 
-  op::EmbeddingLayer* create_embedding_layer() override;
+  void create_rmsnorm_layer() override;
+
+  void create_embedding_layer() override;
 
   tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) override;
 
