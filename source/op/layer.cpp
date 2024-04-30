@@ -1,28 +1,32 @@
 #include "op/layer.h"
-
 #include <glog/logging.h>
-
 #include <numeric>
 #include <utility>
 
 namespace op {
-BaseLayer::BaseLayer(LayerType layer_type, base::DataType data_type,
-                     std::string layer_name)
-    : layer_type_(layer_type),
-      data_type_(data_type),
-      layer_name_(std::move(layer_name)) {}
+BaseLayer::BaseLayer(LayerType layer_type, base::DataType data_type, std::string layer_name)
+    : layer_type_(layer_type), data_type_(data_type), layer_name_(std::move(layer_name)) {
+}
 
-base::DataType BaseLayer::data_type() const { return data_type_; }
+base::DataType BaseLayer::data_type() const {
+  return data_type_;
+}
 
-LayerType BaseLayer::layer_type() const { return layer_type_; }
+LayerType BaseLayer::layer_type() const {
+  return layer_type_;
+}
 
 Layer::Layer(LayerType layer_type, std::string layer_name)
-    : BaseLayer(layer_type, base::DataType::kDataTypeFp32,
-                std::move(layer_name)) {}
+    : BaseLayer(layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
+}
 
-base::Status Layer::init() { return base::Status::kFunctionUnImplement; }
+base::Status Layer::init() {
+  return base::error::Success();
+}
 
-base::Status Layer::forward() { return base::Status::kFunctionUnImplement; }
+base::Status Layer::forward() {
+  return base::error::FunctionNotImplement("");
+}
 
 void Layer::set_input(int32_t idx, const tensor::Tensor& input) {
   CHECK_GE(idx, 0);
@@ -54,7 +58,9 @@ tensor::Tensor& Layer::get_output(int32_t idx) {
   return outputs_.at(idx);
 }
 
-base::Status Layer::check() { return base::Status::kSuccess; }
+base::Status Layer::check() {
+  return base::error::Success();
+}
 
 const tensor::Tensor& Layer::get_output(int32_t idx) const {
   CHECK_GE(idx, 0);
@@ -62,16 +68,25 @@ const tensor::Tensor& Layer::get_output(int32_t idx) const {
   return outputs_.at(idx);
 }
 
-void Layer::reset_input_size(size_t size) { inputs_.resize(size); }
+void Layer::reset_input_size(size_t size) {
+  inputs_.resize(size);
+}
 
-void Layer::reset_output_size(size_t size) { outputs_.resize(size); }
+void Layer::reset_output_size(size_t size) {
+  outputs_.resize(size);
+}
 
-size_t Layer::input_size() const { return inputs_.size(); }
+size_t Layer::input_size() const {
+  return inputs_.size();
+}
 
-size_t Layer::output_size() const { return outputs_.size(); }
+size_t Layer::output_size() const {
+  return outputs_.size();
+}
 
 LayerFp32Param::LayerFp32Param(LayerType layer_type, std::string layer_name)
-    : Layer(layer_type, std::move(layer_name)) {}
+    : Layer(layer_type, std::move(layer_name)) {
+}
 
 void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
   CHECK_GE(idx, 0);
@@ -91,8 +106,7 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
 
-  size_t size = std::accumulate(dims.begin(), dims.end(), sizeof(float),
-                                std::multiplies<>());
+  size_t size = std::accumulate(dims.begin(), dims.end(), sizeof(float), std::multiplies<>());
   std::shared_ptr<base::Buffer> buffer =
       std::make_shared<base::Buffer>(size, nullptr, (void*)(weight_ptr), true);
 
@@ -101,9 +115,13 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
   weights_.at(idx) = weight;
 }
 
-void LayerFp32Param::reset_weight_size(size_t size) { weights_.resize(size); }
+void LayerFp32Param::reset_weight_size(size_t size) {
+  weights_.resize(size);
+}
 
-size_t LayerFp32Param::weight_size() const { return weights_.size(); }
+size_t LayerFp32Param::weight_size() const {
+  return weights_.size();
+}
 
 tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {
   CHECK_GE(idx, 0);

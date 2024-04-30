@@ -5,7 +5,7 @@
 namespace op {
 class EmbeddingLayer : public LayerFp32Param {
  public:
-  explicit EmbeddingLayer(int32_t seq_len, int32_t dim, int32_t vocab_size);
+  explicit EmbeddingLayer(int32_t dim, int32_t seq_len, int32_t vocab_size);
 
   base::Status check() override;
 

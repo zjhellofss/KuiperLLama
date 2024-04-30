@@ -21,7 +21,7 @@ class Model {
 
   virtual base::Status init(base::DeviceType device_type) = 0;
 
-  virtual tensor::Tensor forward(const std::vector<int>& tokens, int start_pos) = 0;
+  virtual base::Status forward(const std::vector<int>& tokens, int start_pos) = 0;
 
   base::ModelType model_type() const;
 
@@ -38,7 +38,9 @@ class Model {
 
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
 
-  virtual tensor::Tensor get_buffer(ModelBufferIdx buffer_idx) = 0;
+  virtual tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) = 0;
+
+  virtual const tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) const = 0;
 
   virtual base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) = 0;
 

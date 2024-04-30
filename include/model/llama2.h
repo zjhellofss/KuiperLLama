@@ -24,7 +24,7 @@ class LLama2Model : public Model {
 
   base::Status init(base::DeviceType device_type) override;
 
-  tensor::Tensor forward(const std::vector<int>& tokens, int start_pos) override;
+  base::Status forward(const std::vector<int>& tokens, int start_pos) override;
 
   std::vector<int32_t> encode(const std::string& sentence) override;
 
@@ -35,7 +35,10 @@ class LLama2Model : public Model {
 
   op::EmbeddingLayer* create_embedding_layer() override;
 
-  tensor::Tensor get_buffer(ModelBufferIdx buffer_idx) override;
+  tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) override;
+
+  const tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) const override;
+
   base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) override;
 
  private:

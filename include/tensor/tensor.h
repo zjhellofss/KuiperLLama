@@ -41,8 +41,6 @@ class Tensor {
 
   int32_t get_dim(int32_t idx) const;
 
-  void reget_dim(const std::vector<int32_t>& dims);
-
   const std::vector<int32_t>& dims() const;
 
   std::vector<size_t> strides() const;

@@ -35,71 +35,78 @@ LLama2Model::LLama2Model(std::string token_path, std::string model_path)
 }
 
 base::Status LLama2Model::init(base::DeviceType device_type) {
+  using namespace base;
   if (token_path_.empty()) {
-    return base::Status::kPathNotValid;
+    return error::PathNotValid(token_path_);
   }
 
   auto sentence_piece_processor = std::make_unique<sentencepiece::SentencePieceProcessor>();
   const auto& status = sentence_piece_processor->Load(token_path_);
   if (!status.ok()) {
-    LOG(ERROR) << "The tokenize model load failed, may be the path " << token_path_
-               << " is not valid!";
-    return base::Status::kPathNotValid;
+    return error::PathNotValid(token_path_);
   }
 
   vocab_size_ = sentence_piece_processor->GetPieceSize();
   if (vocab_size_ <= 0) {
-    return base::Status::kParamReadError;
+    return error::ModelParseError("The vocab size param read error from the model file!");
   }
   device_type_ = device_type;
   encode_layer_ =
       std::make_unique<op::EncodeLayer>(true, false, std::move(sentence_piece_processor));
-  base::Status read_status = read_model_file();
-  if (read_status != base::Status::kSuccess) {
-    LOG(ERROR) << "Create layers in the llama model failed.";
+
+  Status read_status = read_model_file();
+  if (!read_status) {
     return read_status;
   }
 
   init_mem();
-  return base::Status::kSuccess;
+  return error::Success();
 }
 
-tensor::Tensor LLama2Model::forward(const std::vector<int>& tokens, int start_pos) {
+base::Status LLama2Model::forward(const std::vector<int>& tokens, int start_pos) {
   auto input_tokens = get_buffer(ModelBufferIdx::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferIdx::kInputEmbeddings);
   int32_t* input_tokens_ptr = input_tokens.ptr<int32_t>();
+  if (!input_tokens_ptr) {
+    return base::error::InternalError("Can't get the input token pointer in the forward function.");
+  }
   for (const int& token : tokens) {
     *input_tokens_ptr = token;
     input_tokens_ptr += 1;
   }
   auto input_token_num =
       tensor::Tensor(base::DataType::kDataTypeInt32, static_cast<int32_t>(tokens.size()));
-  CHECK(embedding_layer_ != nullptr) << "Create embedding layer failed in the init stage.";
+  if (!embedding_layer_) {
+    return base::error::InternalError("Create embedding layer failed in the init stage.");
+  }
+
   embedding_layer_->set_input(0, input_tokens);
   embedding_layer_->set_input(1, input_token_num);
   embedding_layer_->set_output(0, input_embeddings);
-
-  embedding_layer_->forward();
-  return tensor::Tensor{};
+  auto embedding_status = embedding_layer_->forward();
+  if (!embedding_status) {
+    embedding_status.set_err_msg("The embedding layer forward failed: " +
+                                 embedding_status.get_err_msg());
+    return embedding_status;
+  }
+  return base::error::Success();
 }
 
 base::Status LLama2Model::read_model_file() {
+  using namespace base;
   FILE* file = fopen(model_path_.data(), "rb");
   if (!file) {
-    LOG(ERROR) << "Failed to open the file. The path may be invalid.";
-    return base::Status::kPathNotValid;
+    return error::PathNotValid("Failed to open the file. The path may be invalid.");
   }
   config_ = std::make_unique<LlamaModelConfig>();
   if (fread(config_.get(), sizeof(LlamaModelConfig), 1, file) != 1) {
-    LOG(ERROR) << "Failed to retrieve the configuration information from the "
-                  "model file.";
-    return base::Status::kParamReadError;
+    return error::ModelParseError(
+        "Failed to retrieve the configuration information from the model file.");
   }
 
   if (std::abs(config_->vocab_size) != vocab_size_) {
-    LOG(ERROR) << "Vocabulary size mismatch between the model file and the "
-                  "token list.";
-    return base::Status::kParamReadError;
+    return error::ModelParseError(
+        "Vocabulary size mismatch between the model file and the token list.");
   }
 
   raw_model_data_ = std::make_unique<LLamaRawModelData>();
@@ -109,9 +116,8 @@ base::Status LLama2Model::read_model_file() {
 
   int32_t fd = open(model_path_.data(), O_RDONLY);
   if (fd == -1) {
-    LOG(ERROR) << "Failed to open the weight file " << model_path_
-               << " may be the path does not exist!";
-    return base::Status::kPathNotValid;
+    return error::PathNotValid("Failed to open the weight file " + model_path_ +
+                               " may be the path does not exist!");
   }
 
   raw_model_data_->fd = fd;
@@ -119,23 +125,22 @@ base::Status LLama2Model::read_model_file() {
       mmap(nullptr, raw_model_data_->file_size, PROT_READ, MAP_PRIVATE, raw_model_data_->fd, 0));
 
   if (raw_model_data_->data == MAP_FAILED || raw_model_data_->data == nullptr) {
-    LOG(ERROR) << "Failed to map the weight file " << model_path_ << " into memory.";
-    return base::Status::kWeightReadError;
+    return error::ModelParseError("Failed to map the weight file " + model_path_ + " into memory.");
   }
 
   raw_model_data_->weight_data = raw_model_data_->data + sizeof(LlamaModelConfig) / sizeof(float);
   if (raw_model_data_ == nullptr) {
-    LOG(ERROR) << "Failed to map the weight file " << model_path_
-               << " into memory, the pointer to weight start address is null";
-    return base::Status::kWeightReadError;
+    LOG(ERROR);
+    return error::ModelParseError("Failed to map the weight file " + model_path_ +
+                                  " into memory, the pointer to weight start address is null");
   }
 
   auto embedding_layer = create_embedding_layer();
   if (!embedding_layer) {
-    return base::Status::kCreateLayerFailed;
+    return error::InternalError("Create the embedding layer failed!");
   }
   embedding_layer_ = std::unique_ptr<op::EmbeddingLayer>(embedding_layer);
-  return base::Status::kSuccess;
+  return error::Success();
 }
 
 std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
@@ -146,6 +151,7 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
 op::EmbeddingLayer* LLama2Model::create_embedding_layer() {
   op::EmbeddingLayer* embedding_layer =
       new op::EmbeddingLayer(config_->dim, config_->seq_len, std::abs(config_->vocab_size));
+
   const float* weight_embedding = raw_model_data_->weight(0);
   embedding_layer->reset_weight_size(1);
   embedding_layer->reset_input_size(2);
@@ -167,20 +173,24 @@ void LLama2Model::init_mem() {
 
   input_tokens.allocate(alloc);
   input_embeddings.allocate(alloc);
-  CHECK(insert_buffer(ModelBufferIdx::kInputTokens, input_tokens) == base::Status::kSuccess);
-  CHECK(insert_buffer(ModelBufferIdx::kInputEmbeddings, input_embeddings) ==
-        base::Status::kSuccess);
+  CHECK(insert_buffer(ModelBufferIdx::kInputTokens, input_tokens));
+  CHECK(insert_buffer(ModelBufferIdx::kInputEmbeddings, input_embeddings));
 }
 
 base::Status LLama2Model::insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) {
   if (buffers_.count(buffer_idx) > 0) {
-    return base::Status::kKeyValueHasExist;
+    return base::error::KeyHasExits(std::to_string(int(buffer_idx)) + " has exits in the buffers");
   }
   buffers_.insert({buffer_idx, tensor});
-  return base::Status::kSuccess;
+  return base::error::Success();
 }
 
-tensor::Tensor LLama2Model::get_buffer(ModelBufferIdx buffer_idx) {
+tensor::Tensor& LLama2Model::get_buffer(ModelBufferIdx buffer_idx) {
+  CHECK_GT(buffers_.count(buffer_idx), 0);
+  return buffers_.at(buffer_idx);
+}
+
+const tensor::Tensor& LLama2Model::get_buffer(ModelBufferIdx buffer_idx) const {
   CHECK_GT(buffers_.count(buffer_idx), 0);
   return buffers_.at(buffer_idx);
 }

@@ -10,72 +10,73 @@ EmbeddingLayer::EmbeddingLayer(int32_t dim, int32_t seq_len, int32_t vocab_size)
 
 base::Status EmbeddingLayer::check() {
   if (this->input_size() != 2) {
-    return base::Status::kInferErrorInput;
+    return base::error::InvalidArgument("The number of input tensors is wrong.");
   }
   if (this->output_size() != 1) {
-    return base::Status::kInferErrorOutput;
+    return base::error::InvalidArgument("The number of output tensors is wrong.");
   }
   if (this->weight_size() != 1) {
-    return base::Status::kInferErrorWeight;
+    return base::error::InvalidArgument("The number of output tensors is wrong.");
   }
 
   const auto& input_tensor = this->get_input(0);
   if (input_tensor.is_empty()) {
-    return base::Status::kInferErrorInput;
+    return base::error::InvalidArgument("The input tensor is empty.");
   }
   if (input_tensor.device_type() != base::DeviceType::kDeviceCPU) {
-    return base::Status::kInferErrorInput;
+    return base::error::InvalidArgument("The input tensor has a wrong device type.");
   }
   const auto& input_num = this->get_input(1).size();
   if (input_num > input_tensor.size()) {
-    return base::Status::kInferErrorInput;
+    return base::error::InvalidArgument("The number of input tensor is greater than seq len.");
   }
   if (input_tensor.ptr<int32_t>() == nullptr) {
-    return base::Status::kInferErrorInput;
+    return base::error::InvalidArgument("The input tensor is nullptr.");
   }
   if (input_tensor.get_dim(0) != seq_len_) {
-    return base::Status::kInferErrorInput;
+    return base::error::InvalidArgument("The dim0 of input tensor is not equal to the seq len.");
   }
 
   const auto& weight_tensor = this->get_weight(0);
   if (weight_tensor.is_empty()) {
-    return base::Status::kInferErrorWeight;
+    return base::error::InvalidArgument("The output tensor is empty.");
   }
   if (weight_tensor.device_type() != base::DeviceType::kDeviceCPU) {
-    return base::Status::kInferErrorWeight;
+    return base::error::InvalidArgument("The weight tensor has a wrong device type.");
   }
   if (weight_tensor.ptr<float>() == nullptr) {
-    return base::Status::kInferErrorWeight;
+    return base::error::InvalidArgument("The weight tensor is nullptr.");
   }
   if (weight_tensor.get_dim(0) != vocab_size_) {
-    return base::Status::kInferErrorWeight;
+    return base::error::InvalidArgument(
+        "The dim0 of weight tensor is not equal to the vocab size.");
   }
   if (weight_tensor.get_dim(1) != dim_) {
-    return base::Status::kInferErrorWeight;
+    return base::error::InvalidArgument("The dim1 of weight tensor is not equal to the token dim.");
   }
 
   const auto& output_tensor = this->get_output(0);
   if (output_tensor.is_empty()) {
-    return base::Status::kInferErrorOutput;
+    return base::error::InvalidArgument("The output tensor is empty.");
   }
   if (output_tensor.device_type() != base::DeviceType::kDeviceCPU) {
-    return base::Status::kInferErrorOutput;
+    return base::error::InvalidArgument("The output tensor has a wrong device type.");
   }
   if (output_tensor.ptr<float>() == nullptr) {
-    return base::Status::kInferErrorOutput;
+    return base::error::InvalidArgument("The output tensor is nullptr.");
   }
   if (output_tensor.get_dim(0) != seq_len_) {
-    return base::Status::kInferErrorOutput;
+    return base::error::InvalidArgument("The dim0 of output tensor is not equal to the seq len.");
   }
   if (output_tensor.get_dim(1) != dim_) {
-    return base::Status::kInferErrorOutput;
+    return base::error::InvalidArgument("The dim1 of output tensor is not equal to the token dim.");
   }
-  return base::Status::kSuccess;
+  return base::error::Success();
 }
 
 base::Status EmbeddingLayer::forward() {
-  const auto& status = check();
-  if (status != base::Status::kSuccess) {
+  base::Status status = check();
+  if (!status) {
     return status;
   }
 
@@ -90,12 +91,12 @@ base::Status EmbeddingLayer::forward() {
   for (int32_t i = 0; i < input_num; ++i) {
     int32_t token = *input_tensor.index<int32_t>(i);
     if (token > vocab_size_) {
-      return base::Status::kInferErrorInput;
+      return base::error::InternalError("Token is greater than vocab size.");
     }
     allocator->memcpy((void*)weight_tensor.index<float>(token * weight_dim),
                       (void*)output_tensor.index<float>(i * weight_dim),
                       weight_dim * sizeof(float));
   }
-  return base::Status::kSuccess;
+  return base::StatusCode::kSuccess;
 }
 }  // namespace op
