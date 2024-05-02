@@ -18,6 +18,7 @@ enum class ModelBufferIdx {
   kOutputRMSNorm = 2,
   kKeyCache = 3,
   kValueCache = 4,
+  kQuery = 5,
 };
 
 class Model {
@@ -50,7 +51,6 @@ class Model {
   virtual tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) = 0;
 
   virtual const tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) const = 0;
-
 
   virtual base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) = 0;
 

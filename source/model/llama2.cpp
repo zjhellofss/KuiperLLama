@@ -114,26 +114,37 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
     rms_input.set_device_type(device_type_);
 
     for (int32_t l = 0; l < layer_num; ++l) {
+      // attn rmsnorm
       const auto& attn_norm_layer = rmsnorm_layers_.at(l);
       attn_norm_layer->set_input(0, rms_input);
       attn_norm_layer->set_output(0, rms_output);
       attn_norm_layer->forward();
 
+      // kv cache
       int32_t layer_offset = l * seq_len * kv_dim;
       float* key_cache_ptr = get_buffer(ModelBufferIdx::kKeyCache).ptr<float>();
       float* val_cache_ptr = get_buffer(ModelBufferIdx::kValueCache).ptr<float>();
 
-      // tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num * seq_len * kv_dim);
-      auto key_cache_buffer = std::make_shared<base::Buffer>(
-          dim * sizeof(float), nullptr, key_cache_ptr + layer_offset + pos * kv_dim, true);
-      auto val_cache_buffer = std::make_shared<base::Buffer>(
-          dim * sizeof(float), nullptr, val_cache_ptr + layer_offset + pos * kv_dim, true);
-      key_cache_buffer->set_device_type(device_type_);
-      val_cache_buffer->set_device_type(device_type_);
-      tensor::Tensor key_cache(base::DataType::kDataTypeFp32, dim);
-      tensor::Tensor val_cache(base::DataType::kDataTypeFp32, dim);
-      key_cache.assign(key_cache_buffer);
-      val_cache.assign(val_cache_buffer);
+      auto key_cache = std::make_shared<base::Buffer>(
+          kv_dim * sizeof(float), nullptr, key_cache_ptr + layer_offset + pos * kv_dim, true);
+      auto val_cache = std::make_shared<base::Buffer>(
+          kv_dim * sizeof(float), nullptr, val_cache_ptr + layer_offset + pos * kv_dim, true);
+      key_cache->set_device_type(device_type_);
+      val_cache->set_device_type(device_type_);
+      tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim);
+      tensor::Tensor val(base::DataType::kDataTypeFp32, kv_dim);
+      key.assign(key_cache);
+      val.assign(val_cache);
+
+      tensor::Tensor query = this->get_buffer(ModelBufferIdx::kQuery);
+      if (query.size() != dim) {
+        return base::error::InternalError("The query dim is not equal to dim.");
+      }
+
+      // wq wk wv @ input
+      wq_layers_.at(l)->set_input(0, rms_output);
+      wq_layers_.at(l)->set_output(0, query);
+      wq_layers_.at(l)->forward();
     }
   }
 
@@ -309,6 +320,11 @@ void LLama2Model::init_mem() {
   value_cache.allocate(alloc);
   CHECK(insert_buffer(ModelBufferIdx::kKeyCache, key_cache));
   CHECK(insert_buffer(ModelBufferIdx::kValueCache, value_cache));
+
+  // Wq query output
+  tensor::Tensor query(base::DataType::kDataTypeFp32, config_->dim);
+  query.allocate(alloc);
+  CHECK(insert_buffer(ModelBufferIdx::kQuery, query));
 }
 
 base::Status LLama2Model::insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) {
