@@ -12,32 +12,50 @@ static inline size_t MultiplyAccumulate(T begin, T end, Tp init) {
   return size;
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0) : data_type_(data_type) {
+Tensor::Tensor(base::DataType data_type, int32_t dim0, bool need_alloc,
+               std::shared_ptr<base::DeviceAllocator> alloc)
+    : data_type_(data_type) {
   dims_.push_back(dim0);
   size_ = dim0;
+  if (need_alloc && alloc) {
+    allocate(alloc);
+  }
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1) : data_type_(data_type) {
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_alloc,
+               std::shared_ptr<base::DeviceAllocator> alloc)
+    : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
   size_ = dim0 * dim1;
+  if (need_alloc && alloc) {
+    allocate(alloc);
+  }
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2)
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, bool need_alloc,
+               std::shared_ptr<base::DeviceAllocator> alloc)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
   dims_.push_back(dim2);
   size_ = dim0 * dim1 * dim2;
+  if (need_alloc && alloc) {
+    allocate(alloc);
+  }
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3)
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3,
+               bool need_alloc, std::shared_ptr<base::DeviceAllocator> alloc)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
   dims_.push_back(dim2);
   dims_.push_back(dim3);
   size_ = dim0 * dim1 * dim2 * dim3;
+  if (need_alloc && alloc) {
+    allocate(alloc);
+  }
 }
 
 Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
@@ -165,7 +183,7 @@ std::vector<size_t> Tensor::strides() const {
 }
 
 bool Tensor::is_empty() const {
-  return size_ == 0 || buffer_ == nullptr;
+  return size_ == 0 || buffer_ == nullptr || buffer_->ptr() == nullptr;
 }
 
 }  // namespace tensor

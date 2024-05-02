@@ -12,6 +12,7 @@ enum class LayerType : uint8_t {
   kLayerEncode = 2,
   kLayerEmbedding = 3,
   kLayerRMSNorm = 4,
+  kLayerMatmul = 5,
 };
 
 class BaseLayer {

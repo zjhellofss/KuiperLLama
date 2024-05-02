@@ -24,7 +24,7 @@ class LLama2Model : public Model {
 
   base::Status init(base::DeviceType device_type) override;
 
-  base::Status forward(const std::vector<int>& tokens, int start_pos) override;
+  base::Status forward(const std::vector<int>& tokens, int step_pos) override;
 
   std::vector<int32_t> encode(const std::string& sentence) override;
 
@@ -33,15 +33,18 @@ class LLama2Model : public Model {
 
   base::Status gen_model_from_file() override;
 
-  void create_rmsnorm_layer() override;
+  void create_rmsnorm_layers() override;
 
   void create_embedding_layer() override;
+
+  void create_matmul_layers() override;
 
   tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) override;
 
   const tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) const override;
 
   base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) override;
+
 
  private:
   int32_t vocab_size_ = 0;

@@ -49,7 +49,7 @@ base::Status RmsNormLayer::check() {
     return base::error::InvalidArgument("The input tensor is nullptr.");
   }
   if (input_tensor.get_dim(0) != dim_) {
-    return base::error::InvalidArgument("The dim0 of input tensor is not equal to the seq len.");
+    return base::error::InvalidArgument("The dim0 of input tensor is not equal to the dim.");
   }
 
   const auto& weight_tensor = this->get_weight(0);
@@ -78,7 +78,7 @@ base::Status RmsNormLayer::check() {
     return base::error::InvalidArgument("The output tensor is nullptr.");
   }
   if (output_tensor.get_dim(0) != dim_) {
-    return base::error::InvalidArgument("The dim0 of output tensor is not equal to the seq len.");
+    return base::error::InvalidArgument("The dim0 of output tensor is not equal to the dim.");
   }
   return base::error::Success();
 }

@@ -5,6 +5,7 @@
 #include <sys/mman.h>
 #include <utility>
 #include "op/embedding_layer.h"
+#include "op/matmul.h"
 
 namespace model {
 LLamaRawModelData::~LLamaRawModelData() {
@@ -63,7 +64,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   return error::Success();
 }
 
-base::Status LLama2Model::forward(const std::vector<int>& tokens, int start_pos) {
+base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) {
   auto input_tokens = get_buffer(ModelBufferIdx::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferIdx::kInputEmbeddings);
   int32_t* input_tokens_ptr = input_tokens.ptr<int32_t>();
@@ -98,22 +99,41 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int start_pos)
   if (rms_output.is_empty()) {
     return base::error::InternalError("The rms output tensor is empty!");
   }
+
+  int32_t dim = config_->dim;
+  int32_t layer_num = config_->layer_num;
+  int32_t seq_len = config_->seq_len;
+  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
+
   for (int32_t i = 0; i < tokens.size(); ++i) {
-    int32_t dim = config_->dim;
-    std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+    int32_t pos = step_pos + i;
+    std::shared_ptr<base::Buffer> rms_buffer = std::make_shared<base::Buffer>(
         dim * sizeof(float), nullptr, input_embeddings.index<float>(i * dim), true);
     tensor::Tensor rms_input(base::DataType::kDataTypeFp32, dim);
-    rms_input.assign(buffer);
+    rms_input.assign(rms_buffer);
     rms_input.set_device_type(device_type_);
 
-    for (int32_t j = 0; j < config_->layer_num; ++j) {
-      if (j == 11) {
-        int k = 3;
-      }
-      const auto& attn_norm_layer = rmsnorm_layers_.at(j);
+    for (int32_t l = 0; l < layer_num; ++l) {
+      const auto& attn_norm_layer = rmsnorm_layers_.at(l);
       attn_norm_layer->set_input(0, rms_input);
       attn_norm_layer->set_output(0, rms_output);
       attn_norm_layer->forward();
+
+      int32_t layer_offset = l * seq_len * kv_dim;
+      float* key_cache_ptr = get_buffer(ModelBufferIdx::kKeyCache).ptr<float>();
+      float* val_cache_ptr = get_buffer(ModelBufferIdx::kValueCache).ptr<float>();
+
+      // tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num * seq_len * kv_dim);
+      auto key_cache_buffer = std::make_shared<base::Buffer>(
+          dim * sizeof(float), nullptr, key_cache_ptr + layer_offset + pos * kv_dim, true);
+      auto val_cache_buffer = std::make_shared<base::Buffer>(
+          dim * sizeof(float), nullptr, val_cache_ptr + layer_offset + pos * kv_dim, true);
+      key_cache_buffer->set_device_type(device_type_);
+      val_cache_buffer->set_device_type(device_type_);
+      tensor::Tensor key_cache(base::DataType::kDataTypeFp32, dim);
+      tensor::Tensor val_cache(base::DataType::kDataTypeFp32, dim);
+      key_cache.assign(key_cache_buffer);
+      val_cache.assign(val_cache_buffer);
     }
   }
 
@@ -168,9 +188,15 @@ base::Status LLama2Model::gen_model_from_file() {
     return error::InternalError("Create the embedding layer failed!");
   }
 
-  create_rmsnorm_layer();
+  create_rmsnorm_layers();
   if (rmsnorm_layers_.size() != config_->layer_num) {
     return error::InternalError("Create the rmsnorm layer failed!");
+  }
+
+  create_matmul_layers();
+  if (wq_layers_.size() != config_->layer_num || wk_layers_.size() != config_->layer_num ||
+      wv_layers_.size() != config_->layer_num) {
+    return error::InternalError("Create the matmul layer in the attention layers failed.");
   }
   return error::Success();
 }
@@ -192,7 +218,48 @@ void LLama2Model::create_embedding_layer() {
   embedding_layer_->get_weight(0).set_device_type(device_type_);
 }
 
-void LLama2Model::create_rmsnorm_layer() {
+void LLama2Model::create_matmul_layers() {
+  int32_t layer_num = config_->layer_num;
+  int32_t dim = config_->dim;
+  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
+
+  int32_t pos = config_->dim * std::abs(config_->vocab_size) + dim * layer_num;
+  for (int32_t i = 0; i < layer_num; ++i) {
+    auto wq = std::make_unique<op::MatmulLayer>(dim, dim);
+    wq->reset_input_size(1);
+    wq->reset_output_size(1);
+    wq->reset_weight_size(1);
+    wq->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos));
+    wq->get_weight(0).set_device_type(device_type_);
+    pos += dim * dim;
+    wq_layers_.push_back(std::move(wq));
+  }
+
+  for (int32_t i = 0; i < layer_num; ++i) {
+    auto wk = std::make_unique<op::MatmulLayer>(kv_dim, dim);
+    wk->reset_input_size(1);
+    wk->reset_output_size(1);
+    wk->reset_weight_size(1);
+
+    wk->set_weight(0, {kv_dim, dim}, this->raw_model_data_->weight(pos));
+    wk->get_weight(0).set_device_type(device_type_);
+    wk_layers_.push_back(std::move(wk));
+    pos += kv_dim * dim;
+  }
+
+  for (int32_t i = 0; i < layer_num; ++i) {
+    auto wv = std::make_unique<op::MatmulLayer>(kv_dim, dim);
+    wv->reset_input_size(1);
+    wv->reset_output_size(1);
+    wv->reset_weight_size(1);
+    wv->set_weight(0, {kv_dim, dim}, this->raw_model_data_->weight(pos));
+    wv->get_weight(0).set_device_type(device_type_);
+    wv_layers_.push_back(std::move(wv));
+    pos += kv_dim * dim;
+  }
+}
+
+void LLama2Model::create_rmsnorm_layers() {
   int32_t layer_num = config_->layer_num;
   int32_t rmsnorm_pos = config_->dim * std::abs(config_->vocab_size);
 
@@ -230,6 +297,18 @@ void LLama2Model::init_mem() {
   tensor::Tensor rms_output(base::DataType::kDataTypeFp32, config_->dim);
   rms_output.allocate(alloc);
   CHECK(insert_buffer(ModelBufferIdx::kOutputRMSNorm, rms_output));
+
+  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
+  int32_t layer_num = config_->layer_num;
+  int32_t seq_len = config_->seq_len;
+
+  // kv cache
+  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num * seq_len * kv_dim);
+  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, layer_num * seq_len * kv_dim);
+  key_cache.allocate(alloc);
+  value_cache.allocate(alloc);
+  CHECK(insert_buffer(ModelBufferIdx::kKeyCache, key_cache));
+  CHECK(insert_buffer(ModelBufferIdx::kValueCache, value_cache));
 }
 
 base::Status LLama2Model::insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) {
@@ -237,6 +316,9 @@ base::Status LLama2Model::insert_buffer(ModelBufferIdx buffer_idx, const tensor:
     return base::error::KeyHasExits(std::to_string(int(buffer_idx)) + " has exits in the buffers");
   }
   buffers_.insert({buffer_idx, tensor});
+  if (tensor.is_empty()) {
+    return base::error::InvalidArgument("The tensor is empty for inserting buffer.");
+  }
   return base::error::Success();
 }
 

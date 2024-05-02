@@ -6,6 +6,7 @@
 #include "op/embedding_layer.h"
 #include "op/encode_layer.h"
 #include "op/layer.h"
+#include "op/matmul.h"
 #include "op/rmsnorm_layer.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
@@ -15,6 +16,8 @@ enum class ModelBufferIdx {
   kInputTokens = 0,
   kInputEmbeddings = 1,
   kOutputRMSNorm = 2,
+  kKeyCache = 3,
+  kValueCache = 4,
 };
 
 class Model {
@@ -38,13 +41,16 @@ class Model {
 
   virtual void create_embedding_layer() = 0;
 
-  virtual void create_rmsnorm_layer() = 0;
+  virtual void create_rmsnorm_layers() = 0;
+
+  virtual void create_matmul_layers() = 0;
 
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
 
   virtual tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) = 0;
 
   virtual const tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) const = 0;
+
 
   virtual base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) = 0;
 
@@ -55,6 +61,11 @@ class Model {
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
   std::map<ModelBufferIdx, tensor::Tensor> buffers_;
   std::unique_ptr<op::EncodeLayer> encode_layer_;
+
+  std::vector<std::unique_ptr<op::MatmulLayer>> wq_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> wk_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> wv_layers_;
+
   std::vector<std::unique_ptr<op::RmsNormLayer>> rmsnorm_layers_;
   std::unique_ptr<op::EmbeddingLayer> embedding_layer_;
 };

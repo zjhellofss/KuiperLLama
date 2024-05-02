@@ -11,13 +11,17 @@ class Tensor {
  public:
   explicit Tensor() = default;
 
-  explicit Tensor(base::DataType data_type, int32_t dim0);
+  explicit Tensor(base::DataType data_type, int32_t dim0, bool need_alloc = false,
+                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
-  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1);
+  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_alloc = false,
+                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
-  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2);
+  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2,
+                  bool need_alloc = false, std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
-  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3);
+  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3,
+                  bool need_alloc = false, std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
   explicit Tensor(base::DataType data_type, std::vector<int32_t> dims);
 
