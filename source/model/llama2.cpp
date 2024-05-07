@@ -135,7 +135,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
 
       // rope
       rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{});
-      int k =3;
     }
   }
 
