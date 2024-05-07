@@ -5,7 +5,7 @@ RmsNormLayer::RmsNormLayer(int32_t dim)
     : LayerFp32Param(LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
 }
 
-base::Status RmsNormLayer::forward() {
+base::Status RmsNormLayer::base_forward() {
   auto status = check();
   if (!status) {
     return status;

@@ -28,6 +28,8 @@ class LLama2Model : public Model {
 
   std::vector<int32_t> encode(const std::string& sentence) override;
 
+  std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx, size_t token_pos);
+
  private:
   void init_mem() override;
 
@@ -44,7 +46,6 @@ class LLama2Model : public Model {
   const tensor::Tensor& get_buffer(ModelBufferIdx buffer_idx) const override;
 
   base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) override;
-
 
  private:
   int32_t vocab_size_ = 0;

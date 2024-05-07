@@ -74,7 +74,7 @@ base::Status EmbeddingLayer::check() {
   return base::error::Success();
 }
 
-base::Status EmbeddingLayer::forward() {
+base::Status EmbeddingLayer::base_forward() {
   base::Status status = check();
   if (!status) {
     return status;

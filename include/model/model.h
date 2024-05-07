@@ -54,6 +54,9 @@ class Model {
 
   virtual base::Status insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) = 0;
 
+  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
+                                                                   size_t token_pos) = 0;
+
  protected:
   std::string token_path_;
   std::string model_path_;

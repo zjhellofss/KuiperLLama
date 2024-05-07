@@ -10,7 +10,7 @@ class MatmulLayer : public LayerFp32Param {
  public:
   base::Status check() override;
 
-  base::Status forward() override;
+  base::Status base_forward() override;
 
   explicit MatmulLayer(int32_t dim0, int32_t dim1);
 

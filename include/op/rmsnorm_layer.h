@@ -8,7 +8,7 @@ class RmsNormLayer : public LayerFp32Param {
 
   base::Status check() override;
 
-  base::Status forward() override;
+  base::Status base_forward() override;
  private:
   int32_t dim_ = 0;
 };

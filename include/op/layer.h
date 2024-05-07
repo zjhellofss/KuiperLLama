@@ -25,7 +25,15 @@ class BaseLayer {
 
   virtual base::Status init() = 0;
 
-  virtual base::Status forward() = 0;
+  virtual base::Status base_forward() = 0;
+
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) = 0;
+
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                               const tensor::Tensor& output1) = 0;
+
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                               const tensor::Tensor& input3, const tensor::Tensor& output1) = 0;
 
   virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
 
@@ -34,6 +42,8 @@ class BaseLayer {
   virtual size_t input_size() const = 0;
 
   virtual size_t output_size() const = 0;
+
+  virtual base::Status check() = 0;
 
   virtual tensor::Tensor& get_input(int32_t idx) = 0;
 
@@ -63,9 +73,17 @@ class Layer : public BaseLayer {
 
   base::Status init() override;
 
-  base::Status forward() override;
+  base::Status check() override;
 
-  virtual base::Status check();
+  base::Status base_forward() override;
+
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
+
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                       const tensor::Tensor& output1) override;
+
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                       const tensor::Tensor& input3, const tensor::Tensor& output1) override;
 
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 
@@ -75,9 +93,9 @@ class Layer : public BaseLayer {
 
   const tensor::Tensor& get_output(int32_t idx) const override;
 
-  tensor::Tensor& get_input(int32_t idx);
+  tensor::Tensor& get_input(int32_t idx) override;
 
-  tensor::Tensor& get_output(int32_t idx);
+  tensor::Tensor& get_output(int32_t idx) override;
 
   size_t input_size() const override;
 
@@ -96,17 +114,17 @@ class LayerFp32Param : public Layer {
  public:
   explicit LayerFp32Param(LayerType layer_type, std::string layer_name = "");
 
-  void set_weight(int32_t idx, const tensor::Tensor& weight);
+  size_t weight_size() const;
 
-  const tensor::Tensor& get_weight(int32_t idx) const;
+  void reset_weight_size(size_t size);
 
   tensor::Tensor& get_weight(int32_t idx);
 
+  const tensor::Tensor& get_weight(int32_t idx) const;
+
+  void set_weight(int32_t idx, const tensor::Tensor& weight);
+
   void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
-
-  virtual size_t weight_size() const;
-
-  void reset_weight_size(size_t size);
 
  private:
   std::vector<tensor::Tensor> weights_;

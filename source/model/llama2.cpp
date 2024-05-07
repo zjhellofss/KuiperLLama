@@ -81,10 +81,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
     return base::error::InternalError("Create embedding layer failed in the init stage.");
   }
 
-  embedding_layer_->set_input(0, input_tokens);
-  embedding_layer_->set_input(1, input_token_num);
-  embedding_layer_->set_output(0, input_embeddings);
-  auto embedding_status = embedding_layer_->forward();
+  auto embedding_status =
+      embedding_layer_->forward(input_tokens, input_token_num, input_embeddings);
   if (!embedding_status) {
     embedding_status.set_err_msg("The embedding layer forward failed: " +
                                  embedding_status.get_err_msg());
@@ -102,8 +100,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
 
   int32_t dim = config_->dim;
   int32_t layer_num = config_->layer_num;
-  int32_t seq_len = config_->seq_len;
-  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
 
   for (int32_t i = 0; i < tokens.size(); ++i) {
     int32_t pos = step_pos + i;
@@ -113,38 +109,25 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
     rms_input.assign(rms_buffer);
     rms_input.set_device_type(device_type_);
 
-    for (int32_t l = 0; l < layer_num; ++l) {
+    for (int32_t layer_idx = 0; layer_idx < layer_num; ++layer_idx) {
       // attn rmsnorm
-      const auto& attn_norm_layer = rmsnorm_layers_.at(l);
-      attn_norm_layer->set_input(0, rms_input);
-      attn_norm_layer->set_output(0, rms_output);
-      attn_norm_layer->forward();
+      const auto& attn_norm_layer = rmsnorm_layers_.at(layer_idx);
+      attn_norm_layer->forward(rms_input, rms_output);
 
       // kv cache
-      int32_t layer_offset = l * seq_len * kv_dim;
-      float* key_cache_ptr = get_buffer(ModelBufferIdx::kKeyCache).ptr<float>();
-      float* val_cache_ptr = get_buffer(ModelBufferIdx::kValueCache).ptr<float>();
-
-      auto key_cache = std::make_shared<base::Buffer>(
-          kv_dim * sizeof(float), nullptr, key_cache_ptr + layer_offset + pos * kv_dim, true);
-      auto val_cache = std::make_shared<base::Buffer>(
-          kv_dim * sizeof(float), nullptr, val_cache_ptr + layer_offset + pos * kv_dim, true);
-      key_cache->set_device_type(device_type_);
-      val_cache->set_device_type(device_type_);
-      tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim);
-      tensor::Tensor val(base::DataType::kDataTypeFp32, kv_dim);
-      key.assign(key_cache);
-      val.assign(val_cache);
-
       tensor::Tensor query = this->get_buffer(ModelBufferIdx::kQuery);
       if (query.size() != dim) {
         return base::error::InternalError("The query dim is not equal to dim.");
       }
 
+      if (layer_idx == 29) {
+        int k = 3;
+      }
       // wq wk wv @ input
-      wq_layers_.at(l)->set_input(0, rms_output);
-      wq_layers_.at(l)->set_output(0, query);
-      wq_layers_.at(l)->forward();
+      const auto& [key, val] = slice_kv_cache(layer_idx, pos);
+      wq_layers_.at(layer_idx)->forward(rms_output, query);
+      wk_layers_.at(layer_idx)->forward(rms_output, key);
+      wv_layers_.at(layer_idx)->forward(rms_output, val);
     }
   }
 
@@ -346,6 +329,27 @@ tensor::Tensor& LLama2Model::get_buffer(ModelBufferIdx buffer_idx) {
 const tensor::Tensor& LLama2Model::get_buffer(ModelBufferIdx buffer_idx) const {
   CHECK_GT(buffers_.count(buffer_idx), 0);
   return buffers_.at(buffer_idx);
+}
+
+std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
+                                                                      size_t token_pos) {
+  int32_t seq_len = config_->seq_len;
+  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
+  int32_t layer_offset = layer_idx * seq_len * kv_dim;
+  float* key_cache_ptr = get_buffer(ModelBufferIdx::kKeyCache).ptr<float>();
+  float* val_cache_ptr = get_buffer(ModelBufferIdx::kValueCache).ptr<float>();
+
+  auto key_cache = std::make_shared<base::Buffer>(
+      kv_dim * sizeof(float), nullptr, key_cache_ptr + layer_offset + token_pos * kv_dim, true);
+  auto val_cache = std::make_shared<base::Buffer>(
+      kv_dim * sizeof(float), nullptr, val_cache_ptr + layer_offset + token_pos * kv_dim, true);
+  key_cache->set_device_type(device_type_);
+  val_cache->set_device_type(device_type_);
+  tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim);
+  tensor::Tensor val(base::DataType::kDataTypeFp32, kv_dim);
+  key.assign(key_cache);
+  val.assign(val_cache);
+  return {key, val};
 }
 
 }  // namespace model

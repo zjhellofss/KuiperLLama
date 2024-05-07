@@ -32,7 +32,7 @@ base::Status Layer::init() {
   return base::error::Success();
 }
 
-base::Status Layer::forward() {
+base::Status Layer::base_forward() {
   return base::error::FunctionNotImplement("");
 }
 
@@ -129,6 +129,29 @@ void LayerFp32Param::reset_weight_size(size_t size) {
 
 size_t LayerFp32Param::weight_size() const {
   return weights_.size();
+}
+
+base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& output1) {
+  this->set_input(0, input1);
+  this->set_output(0, output1);
+  return this->base_forward();
+}
+
+base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                            const tensor::Tensor& output1) {
+  this->set_input(0, input1);
+  this->set_input(1, input2);
+  this->set_output(0, output1);
+  return this->base_forward();
+}
+
+base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                            const tensor::Tensor& input3, const tensor::Tensor& output1) {
+  this->set_input(0, input1);
+  this->set_input(0, input2);
+  this->set_input(0, input3);
+  this->set_output(0, output1);
+  return this->base_forward();
 }
 
 tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {
