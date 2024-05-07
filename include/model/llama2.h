@@ -2,7 +2,8 @@
 #define LC_INCLUDE_MODEL_LLAMA_H_
 #include <map>
 #include "model.h"
-#include "op/embedding_layer.h"
+#include "op/embedding.h"
+#include "op/rope.h"
 namespace model {
 
 struct LLamaRawModelData {
@@ -35,6 +36,8 @@ class LLama2Model : public Model {
 
   base::Status gen_model_from_file() override;
 
+  void create_rope_layer();
+
   void create_rmsnorm_layers() override;
 
   void create_embedding_layer() override;
@@ -49,6 +52,7 @@ class LLama2Model : public Model {
 
  private:
   int32_t vocab_size_ = 0;
+  std::unique_ptr<op::RoPELayer> rope_layer_;
   std::unique_ptr<LlamaModelConfig> config_;
   std::unique_ptr<LLamaRawModelData> raw_model_data_;
 };

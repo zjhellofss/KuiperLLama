@@ -1,5 +1,5 @@
-#include "op/rmsnorm_layer.h"
 #include <armadillo>
+#include "op/rmsnorm.h"
 namespace op {
 RmsNormLayer::RmsNormLayer(int32_t dim)
     : LayerFp32Param(LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {

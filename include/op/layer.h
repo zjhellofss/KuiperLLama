@@ -13,6 +13,7 @@ enum class LayerType : uint8_t {
   kLayerEmbedding = 3,
   kLayerRMSNorm = 4,
   kLayerMatmul = 5,
+  kLayerRoPe = 6,
 };
 
 class BaseLayer {
@@ -27,12 +28,12 @@ class BaseLayer {
 
   virtual base::Status base_forward() = 0;
 
-  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) = 0;
+  virtual base::Status forward_i1o1(const tensor::Tensor& input1, const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  virtual base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
                                const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  virtual base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
                                const tensor::Tensor& input3, const tensor::Tensor& output1) = 0;
 
   virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
@@ -77,12 +78,12 @@ class Layer : public BaseLayer {
 
   base::Status base_forward() override;
 
-  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
+  base::Status forward_i1o1(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
 
-  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
                        const tensor::Tensor& output1) override;
 
-  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
                        const tensor::Tensor& input3, const tensor::Tensor& output1) override;
 
   void set_input(int32_t idx, const tensor::Tensor& input) override;

@@ -1,4 +1,4 @@
-#include "op/embedding_layer.h"
+#include "op/embedding.h"
 #include "op/layer.h"
 namespace op {
 EmbeddingLayer::EmbeddingLayer(int32_t dim, int32_t seq_len, int32_t vocab_size)

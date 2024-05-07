@@ -1,5 +1,5 @@
-#include "op/encode_layer.h"
 #include <glog/logging.h>
+#include "op/encode.h"
 namespace op {
 std::vector<int32_t> EncodeLayer::encode(const std::string& sentence) {
   CHECK(sentence_piece_processor_ != nullptr);

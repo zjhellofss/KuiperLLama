@@ -3,11 +3,11 @@
 #include <map>
 #include <string>
 #include "llama2_config.h"
-#include "op/embedding_layer.h"
-#include "op/encode_layer.h"
+#include "op/embedding.h"
+#include "op/encode.h"
 #include "op/layer.h"
 #include "op/matmul.h"
-#include "op/rmsnorm_layer.h"
+#include "op/rmsnorm.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
 
@@ -19,6 +19,7 @@ enum class ModelBufferIdx {
   kKeyCache = 3,
   kValueCache = 4,
   kQuery = 5,
+  kInputPos = 6,
 };
 
 class Model {

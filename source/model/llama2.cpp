@@ -4,7 +4,7 @@
 #include <sentencepiece_processor.h>
 #include <sys/mman.h>
 #include <utility>
-#include "op/embedding_layer.h"
+#include "op/embedding.h"
 #include "op/matmul.h"
 
 namespace model {
@@ -69,7 +69,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
   auto input_embeddings = get_buffer(ModelBufferIdx::kInputEmbeddings);
   int32_t* input_tokens_ptr = input_tokens.ptr<int32_t>();
   if (!input_tokens_ptr) {
-    return base::error::InternalError("Can't get the input token pointer in the forward function.");
+    return base::error::InternalError(
+        "Can't get the input token pointer in the forward_i1o1 function.");
   }
   for (const int& token : tokens) {
     *input_tokens_ptr = token;
@@ -82,9 +83,9 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
   }
 
   auto embedding_status =
-      embedding_layer_->forward(input_tokens, input_token_num, input_embeddings);
+      embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings);
   if (!embedding_status) {
-    embedding_status.set_err_msg("The embedding layer forward failed: " +
+    embedding_status.set_err_msg("The embedding layer forward_i1o1 failed: " +
                                  embedding_status.get_err_msg());
     return embedding_status;
   }
@@ -100,9 +101,15 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
 
   int32_t dim = config_->dim;
   int32_t layer_num = config_->layer_num;
+  int32_t hidden_dim = config_->hidden_dim;
+  int32_t head_size = dim / config_->head_num;
+  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
 
   for (int32_t i = 0; i < tokens.size(); ++i) {
     int32_t pos = step_pos + i;
+    tensor::Tensor pos_tensor = this->get_buffer(ModelBufferIdx::kInputPos);
+    *pos_tensor.index<int32_t>(0) = pos;
+
     std::shared_ptr<base::Buffer> rms_buffer = std::make_shared<base::Buffer>(
         dim * sizeof(float), nullptr, input_embeddings.index<float>(i * dim), true);
     tensor::Tensor rms_input(base::DataType::kDataTypeFp32, dim);
@@ -112,7 +119,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
     for (int32_t layer_idx = 0; layer_idx < layer_num; ++layer_idx) {
       // attn rmsnorm
       const auto& attn_norm_layer = rmsnorm_layers_.at(layer_idx);
-      attn_norm_layer->forward(rms_input, rms_output);
+      attn_norm_layer->forward_i1o1(rms_input, rms_output);
 
       // kv cache
       tensor::Tensor query = this->get_buffer(ModelBufferIdx::kQuery);
@@ -120,14 +127,15 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
         return base::error::InternalError("The query dim is not equal to dim.");
       }
 
-      if (layer_idx == 29) {
-        int k = 3;
-      }
       // wq wk wv @ input
       const auto& [key, val] = slice_kv_cache(layer_idx, pos);
-      wq_layers_.at(layer_idx)->forward(rms_output, query);
-      wk_layers_.at(layer_idx)->forward(rms_output, key);
-      wv_layers_.at(layer_idx)->forward(rms_output, val);
+      wq_layers_.at(layer_idx)->forward_i1o1(rms_output, query);
+      wk_layers_.at(layer_idx)->forward_i1o1(rms_output, key);
+      wv_layers_.at(layer_idx)->forward_i1o1(rms_output, val);
+
+      // rope
+      rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{});
+      int k =3;
     }
   }
 
@@ -191,6 +199,11 @@ base::Status LLama2Model::gen_model_from_file() {
   if (wq_layers_.size() != config_->layer_num || wk_layers_.size() != config_->layer_num ||
       wv_layers_.size() != config_->layer_num) {
     return error::InternalError("Create the matmul layer in the attention layers failed.");
+  }
+
+  create_rope_layer();
+  if (!rope_layer_) {
+    return error::InternalError("");
   }
   return error::Success();
 }
@@ -308,6 +321,11 @@ void LLama2Model::init_mem() {
   tensor::Tensor query(base::DataType::kDataTypeFp32, config_->dim);
   query.allocate(alloc);
   CHECK(insert_buffer(ModelBufferIdx::kQuery, query));
+
+  // Pos tensor
+  tensor::Tensor pos_tensor(base::DataType::kDataTypeInt32, 1);
+  pos_tensor.allocate(alloc);
+  CHECK(insert_buffer(ModelBufferIdx::kInputPos, pos_tensor));
 }
 
 base::Status LLama2Model::insert_buffer(ModelBufferIdx buffer_idx, const tensor::Tensor& tensor) {
@@ -350,6 +368,15 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
   key.assign(key_cache);
   val.assign(val_cache);
   return {key, val};
+}
+
+void LLama2Model::create_rope_layer() {
+  int32_t dim = config_->dim;
+  int32_t head_size = config_->dim / config_->head_num;
+  int32_t kv_dim = (config_->dim * config_->kv_head_num) / config_->head_num;
+  rope_layer_ = std::make_unique<op::RoPELayer>(dim, kv_dim, head_size);
+  rope_layer_->reset_input_size(3);
+  rope_layer_->reset_output_size(1);
 }
 
 }  // namespace model
