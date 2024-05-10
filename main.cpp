@@ -18,8 +18,8 @@ int main() {
   //  tensor.reshape({11, 12, 13});
   //  const auto& strides = tensor.strides();
 
-  char* checkpoint_path = "/home/fss/big_model/llama2_7b.bin";  // e.g. out/model.bin
-  char* tokenizer_path = "/home/fss/big_model/tokenizer.model";
+  char* checkpoint_path = "/home/fss/llama2/llama2_7b.bin";  // e.g. out/model.bin
+  char* tokenizer_path = "/home/fss/llama2/tokenizer.model";
   model::LLama2Model model(tokenizer_path, checkpoint_path);
   model.init(base::DeviceType::kDeviceCPU);
   std::string sentence = "Hi everyone";

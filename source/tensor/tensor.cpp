@@ -4,7 +4,7 @@
 
 namespace tensor {
 template <typename T, typename Tp>
-static inline size_t MultiplyAccumulate(T begin, T end, Tp init) {
+static inline size_t MultiplyAcc(T begin, T end, Tp init) {
   if (begin >= end) {
     return 0;
   }
@@ -60,7 +60,7 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
 
 Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
     : dims_(std::move(dims)), data_type_(data_type) {
-  size_ = MultiplyAccumulate(dims_.begin(), dims_.end(), 1);
+  size_ = MultiplyAcc(dims_.begin(), dims_.end(), 1);
 }
 
 size_t Tensor::size() const {
@@ -135,7 +135,7 @@ void Tensor::set_device_type(base::DeviceType device_type) {
 void Tensor::reset(base::DataType data_type, const std::vector<int32_t>& dims) {
   this->data_type_ = data_type;
   this->dims_ = dims;
-  this->size_ = MultiplyAccumulate(dims.begin(), dims.end(), 1);
+  this->size_ = MultiplyAcc(dims.begin(), dims.end(), 1);
   this->buffer_ = nullptr;
 }
 
@@ -148,7 +148,7 @@ base::DataType Tensor::data_type() const {
 }
 
 void Tensor::reshape(const std::vector<int32_t>& dims) {
-  size_t size = MultiplyAccumulate(dims.begin(), dims.end(), 1);
+  size_t size = MultiplyAcc(dims.begin(), dims.end(), 1);
   if (!buffer_) {
     this->dims_ = dims;
     this->size_ = size;
@@ -174,7 +174,7 @@ std::vector<size_t> Tensor::strides() const {
   std::vector<size_t> strides;
   if (!dims_.empty()) {
     for (int32_t i = 0; i < dims_.size() - 1; ++i) {
-      size_t stride = MultiplyAccumulate(dims_.begin() + i + 1, dims_.end(), 1);
+      size_t stride = MultiplyAcc(dims_.begin() + i + 1, dims_.end(), 1);
       strides.push_back(stride);
     }
     strides.push_back(1);
@@ -185,5 +185,4 @@ std::vector<size_t> Tensor::strides() const {
 bool Tensor::is_empty() const {
   return size_ == 0 || buffer_ == nullptr || buffer_->ptr() == nullptr;
 }
-
 }  // namespace tensor

@@ -14,6 +14,9 @@ enum class LayerType : uint8_t {
   kLayerRMSNorm = 4,
   kLayerMatmul = 5,
   kLayerRoPe = 6,
+  kLayerMHA = 7,
+  kLayerSoftmax = 8,
+  kLayerAdd = 9,
 };
 
 class BaseLayer {
@@ -28,13 +31,19 @@ class BaseLayer {
 
   virtual base::Status base_forward() = 0;
 
-  virtual base::Status forward_i1o1(const tensor::Tensor& input1, const tensor::Tensor& output1) = 0;
+  virtual base::Status forward_i1o1(const tensor::Tensor& input1,
+                                    const tensor::Tensor& output1) = 0;
 
   virtual base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                               const tensor::Tensor& output1) = 0;
+                                    const tensor::Tensor& output1) = 0;
 
   virtual base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                               const tensor::Tensor& input3, const tensor::Tensor& output1) = 0;
+                                    const tensor::Tensor& input3,
+                                    const tensor::Tensor& output1) = 0;
+
+  virtual base::Status forward_i4o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                                    const tensor::Tensor& input3, const tensor::Tensor& input4,
+                                    const tensor::Tensor& output1) = 0;
 
   virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
 
@@ -44,7 +53,7 @@ class BaseLayer {
 
   virtual size_t output_size() const = 0;
 
-  virtual base::Status check() = 0;
+  virtual base::Status check() const = 0;
 
   virtual tensor::Tensor& get_input(int32_t idx) = 0;
 
@@ -74,17 +83,21 @@ class Layer : public BaseLayer {
 
   base::Status init() override;
 
-  base::Status check() override;
+  base::Status check() const override;
 
   base::Status base_forward() override;
 
   base::Status forward_i1o1(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
 
   base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                       const tensor::Tensor& output1) override;
+                            const tensor::Tensor& output1) override;
 
   base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                       const tensor::Tensor& input3, const tensor::Tensor& output1) override;
+                            const tensor::Tensor& input3, const tensor::Tensor& output1) override;
+
+  base::Status forward_i4o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                            const tensor::Tensor& input3, const tensor::Tensor& input4,
+                            const tensor::Tensor& output1) override;
 
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 

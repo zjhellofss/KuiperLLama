@@ -8,7 +8,7 @@ EmbeddingLayer::EmbeddingLayer(int32_t dim, int32_t seq_len, int32_t vocab_size)
       LayerFp32Param(LayerType::kLayerEmbedding, "Embedding") {
 }
 
-base::Status EmbeddingLayer::check() {
+base::Status EmbeddingLayer::check() const {
   if (this->input_size() != 2) {
     return base::error::InvalidArgument("The number of input tensors is wrong.");
   }

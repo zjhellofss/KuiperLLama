@@ -5,7 +5,7 @@ MatmulLayer::MatmulLayer(int32_t dim0, int32_t dim1)
     : LayerFp32Param(LayerType::kLayerMatmul, "Matmul") {
 }
 
-base::Status MatmulLayer::check() {
+base::Status MatmulLayer::check() const{
   if (this->input_size() != 1) {
     return base::error::InvalidArgument();
   }

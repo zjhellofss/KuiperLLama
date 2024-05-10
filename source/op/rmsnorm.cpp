@@ -1,5 +1,5 @@
-#include <armadillo>
 #include "op/rmsnorm.h"
+#include <armadillo>
 namespace op {
 RmsNormLayer::RmsNormLayer(int32_t dim)
     : LayerFp32Param(LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
@@ -26,7 +26,7 @@ base::Status RmsNormLayer::base_forward() {
   return base::error::Success();
 }
 
-base::Status RmsNormLayer::check() {
+base::Status RmsNormLayer::check() const {
   if (this->input_size() != 1) {
     return base::error::InvalidArgument("The number of input tensors is wrong.");
   }

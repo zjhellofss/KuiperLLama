@@ -6,9 +6,10 @@ class RmsNormLayer : public LayerFp32Param {
  public:
   explicit RmsNormLayer(int32_t dim);
 
-  base::Status check() override;
+  base::Status check() const override;
 
   base::Status base_forward() override;
+
  private:
   int32_t dim_ = 0;
 };

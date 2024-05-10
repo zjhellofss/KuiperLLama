@@ -8,7 +8,7 @@
 namespace op {
 class MatmulLayer : public LayerFp32Param {
  public:
-  base::Status check() override;
+  base::Status check() const override;
 
   base::Status base_forward() override;
 
