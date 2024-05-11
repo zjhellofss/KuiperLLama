@@ -2,10 +2,10 @@
 #include <armadillo>
 namespace op {
 MatmulLayer::MatmulLayer(int32_t dim0, int32_t dim1)
-    : LayerFp32Param(LayerType::kLayerMatmul, "Matmul") {
+    : LayerFp32Param(LayerType::kLayerMatmul, "Matmul"), dim0_(dim0), dim1_(dim1) {
 }
 
-base::Status MatmulLayer::check() const{
+base::Status MatmulLayer::check() const {
   if (this->input_size() != 1) {
     return base::error::InvalidArgument();
   }

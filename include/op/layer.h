@@ -45,6 +45,11 @@ class BaseLayer {
                                     const tensor::Tensor& input3, const tensor::Tensor& input4,
                                     const tensor::Tensor& output1) = 0;
 
+  virtual base::Status forward_i5o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                                    const tensor::Tensor& input3, const tensor::Tensor& input4,
+                                    const tensor::Tensor& input5,
+                                    const tensor::Tensor& output1) = 0;
+
   virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
 
   virtual void set_output(int32_t idx, const tensor::Tensor& output) = 0;
@@ -98,6 +103,10 @@ class Layer : public BaseLayer {
   base::Status forward_i4o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
                             const tensor::Tensor& input3, const tensor::Tensor& input4,
                             const tensor::Tensor& output1) override;
+
+  base::Status forward_i5o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                            const tensor::Tensor& input3, const tensor::Tensor& input4,
+                            const tensor::Tensor& input5, const tensor::Tensor& output1) override;
 
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 

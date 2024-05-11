@@ -38,17 +38,19 @@ class LLama2Model : public Model {
 
   base::Status gen_model_from_file() override;
 
+  base::Status create_layers() override;
+
   void create_rope_layer();
 
   void create_add_layer();
 
-  void create_mha_layers() override;
+  void create_mha_layers();
 
-  void create_rmsnorm_layers() override;
+  void create_rmsnorm_layers();
 
-  void create_embedding_layer() override;
+  void create_embedding_layer();
 
-  void create_matmul_layers() override;
+  void create_matmul_layers();
 
   tensor::Tensor& get_buffer(ModelBufferType buffer_idx) override;
 
@@ -59,14 +61,35 @@ class LLama2Model : public Model {
  private:
   int32_t kv_dim_ = 0;
   int32_t kv_mul_ = 0;
-  int32_t hidden_dim_ = 0;
   int32_t head_size_ = 0;
   int32_t vocab_size_ = 0;
 
+  int32_t dim_ = 0;
+  int32_t hidden_dim_ = 0;
+  int32_t layer_num_ = 0;
+  int32_t head_num_ = 0;
+  int32_t kv_head_num_ = 0;
+  int32_t seq_len_ = 0;
+
+  std::unique_ptr<LLamaRawModelData> raw_model_data_;
+  std::map<ModelBufferType, tensor::Tensor> buffers_;
+  std::unique_ptr<op::EncodeLayer> encode_layer_;
+
   std::unique_ptr<op::VecAddLayer> add_layer_;
   std::unique_ptr<op::RoPELayer> rope_layer_;
-  std::unique_ptr<LlamaModelConfig> config_;
-  std::unique_ptr<LLamaRawModelData> raw_model_data_;
+
+  std::unique_ptr<op::MultiHeadAttention> mha_layer_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> wq_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> wk_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> wv_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> wo_layers_;
+
+  std::vector<std::unique_ptr<op::MatmulLayer>> w1_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> w2_layers_;
+  std::vector<std::unique_ptr<op::MatmulLayer>> w3_layers_;
+
+  std::unique_ptr<op::EmbeddingLayer> embedding_layer_;
+  std::vector<std::unique_ptr<op::RmsNormLayer>> rmsnorm_layers_;
 };
 }  // namespace model
 

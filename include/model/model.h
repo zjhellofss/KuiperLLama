@@ -3,12 +3,14 @@
 #include <map>
 #include <string>
 #include "llama2_config.h"
+#include "op/add.h"
 #include "op/embedding.h"
 #include "op/encode.h"
 #include "op/layer.h"
 #include "op/matmul.h"
 #include "op/mha.h"
 #include "op/rmsnorm.h"
+#include "op/rope.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
 
@@ -24,6 +26,11 @@ enum class ModelBufferType {
   kAttn = 7,
   kOutputMHA = 8,
   kAttnOutput = 9,
+  kW1Output = 10,
+  kW2Output = 11,
+  kW3Output = 12,
+  kFFNRMSNorm = 13,
+  kScoreStorage = 14,
 };
 
 class Model {
@@ -45,13 +52,7 @@ class Model {
 
   virtual base::Status gen_model_from_file() = 0;
 
-  virtual void create_embedding_layer() = 0;
-
-  virtual void create_mha_layers() = 0;
-
-  virtual void create_rmsnorm_layers() = 0;
-
-  virtual void create_matmul_layers() = 0;
+  virtual base::Status create_layers() = 0;
 
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
 
@@ -69,17 +70,6 @@ class Model {
   std::string model_path_;
   base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
-  std::map<ModelBufferType, tensor::Tensor> buffers_;
-  std::unique_ptr<op::EncodeLayer> encode_layer_;
-
-  std::unique_ptr<op::MultiHeadAttention> mha_layer_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wq_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wk_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wv_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wo_layers_;
-
-  std::vector<std::unique_ptr<op::RmsNormLayer>> rmsnorm_layers_;
-  std::unique_ptr<op::EmbeddingLayer> embedding_layer_;
 };
 }  // namespace model
 #endif  // LC_INCLUDE_MODEL_MODEL_H_
