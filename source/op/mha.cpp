@@ -50,13 +50,16 @@ base::Status MultiHeadAttention::base_forward() {
     softmax_->forward_i1o1(score_head_tensor, score_head_tensor);
 
     arma::fvec output_head(mha_out.ptr<float>() + h * head_size_, head_size_, false, true);
-    output_head.zeros();
     for (int32_t t = 0; t <= pos_; t++) {
       const float score_value = score.at(t);
       float* value_head_addr =
           value_cache_tensor.ptr<float>() + layer_offset + t * kv_dim_ + (h / kv_mul_) * head_size_;
       arma::fvec value(value_head_addr, head_size_, false, true);
-      output_head += score_value * value;
+      if (!t) {
+        output_head = score_value * value;
+      } else {
+        output_head += score_value * value;
+      }
     }
   }
   return base::error::Success();

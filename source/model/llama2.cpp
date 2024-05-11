@@ -4,6 +4,7 @@
 #include <sentencepiece_processor.h>
 #include <sys/mman.h>
 #include <utility>
+#include "base/tick.h"
 #include "op/embedding.h"
 #include "op/matmul.h"
 
@@ -97,7 +98,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
     tensor::Tensor rms_input(base::DataType::kDataTypeFp32, dim_);
     rms_input.assign(rms_buffer);
     rms_input.set_device_type(device_type_);
-
     for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
       // attn rmsnorm
       const auto& attn_norm_layer = rmsnorm_layers_.at(layer_idx);
@@ -189,8 +189,14 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
         LOG(ERROR) << forward_status.get_err_msg();
         return forward_status;
       }
+
+      tensor::Tensor w3_ouput = get_buffer(ModelBufferType::kW3Output);
+      forward_status = w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput);
+      if (!forward_status) {
+        LOG(ERROR) << forward_status.get_err_msg();
+        return forward_status;
+      }
     }
-    int u =31;
   }
   return base::error::Success();
 }
