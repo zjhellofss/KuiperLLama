@@ -13,19 +13,12 @@ base::Status SoftmaxLayer::base_forward() {
   float* input_ptr = input.ptr<float>();
 
   int32_t size = static_cast<int32_t>(input.size());
-  float sum_value = 0.f;
   float max_value = *std::max(input_ptr, input_ptr + size);
-  for (int32_t i = 0; i < size; ++i) {
-    float input_value = *(input_ptr + i);
-    float exp_sub_value = std::exp(input_value - max_value);
-    *(input_ptr + i) = exp_sub_value;
-    sum_value += exp_sub_value;
-  }
+  arma::fvec input_mat(input_ptr, size, false, true);
+  input_mat = arma::exp(input_mat - max_value);
 
-  for (int i = 0; i < size; ++i) {
-    float input_value = *(input_ptr + i);
-    *(input_ptr + i) = input_value / sum_value;
-  }
+  float sum_value = arma::sum(input_mat);
+  input_mat = input_mat / sum_value;
   return base::error::Success();
 }
 
