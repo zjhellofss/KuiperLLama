@@ -6,20 +6,15 @@
 #include "model/llama2.h"
 #include "tensor/tensor.h"
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    LOG(INFO) << "Usage: ./demo checkpoint_path tokenizer_path ";
+    return -1;
+  }
   std::shared_ptr<base::CPUDeviceAllocator> alloc = std::make_shared<base::CPUDeviceAllocator>();
-  //  Tensor tensor(DataType::kDataTypeFp32, 1, 2, 3, 4);
-  //  tensor.allocate(alloc);
-  //  tensor.allocate(alloc);
-  //
-  //  tensor.reset(DataType::kDataTypeFp32, {4, 5, 6});
-  //  tensor.allocate(alloc);
-  //
-  //  tensor.reshape({11, 12, 13});
-  //  const auto& strides = tensor.strides();
 
-  char* checkpoint_path = "/home/fss/big_model/llama2_7b.bin";  // e.g. out/model.bin
-  char* tokenizer_path = "/home/fss/big_model/tokenizer.model";
+  const char* checkpoint_path = argv[1];  // e.g. out/model.bin
+  const char* tokenizer_path = argv[2];
   model::LLama2Model model(tokenizer_path, checkpoint_path);
   model.init(base::DeviceType::kDeviceCPU);
   std::string sentence = "Hi everyone";

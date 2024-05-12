@@ -34,32 +34,11 @@ base::Status RoPELayer::base_forward() {
 
 base::Status RoPELayer::check() const {
   if (this->input_size() != 3) {
-    return base::error::InvalidArgument("");
+    return base::error::InternalError("The input number is not equal to " + std::to_string(3));
   }
-  tensor::Tensor input1 = this->get_input(0);
-  if (input1.is_empty() || input1.size() != dim_) {
-    return base::error::InvalidArgument("");
+  if (this->output_size() != 1) {
+    return base::error::InternalError("The output number is not equal to " + std::to_string(1));
   }
-  if (input1.data_type() != base::DataType::kDataTypeFp32) {
-    return base::error::InvalidArgument("");
-  }
-
-  tensor::Tensor input2 = this->get_input(1);
-  if (input2.is_empty() || input2.size() != dim_) {
-    return base::error::InvalidArgument("");
-  }
-  if (input2.data_type() != base::DataType::kDataTypeFp32) {
-    return base::error::InvalidArgument("");
-  }
-
-  tensor::Tensor input3 = this->get_input(2);
-  if (input3.is_empty() || input3.size() != 1) {
-    return base::error::InvalidArgument("");
-  }
-  if (input3.data_type() != base::DataType::kDataTypeInt32) {
-    return base::error::InvalidArgument("");
-  }
-
   return base::error::Success();
 }
 

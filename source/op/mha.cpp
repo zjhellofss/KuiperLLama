@@ -74,13 +74,7 @@ void MultiHeadAttention::set_layer_index(int32_t layer_index) {
 }
 
 base::Status MultiHeadAttention::check() const {
-  if (this->input_size() != 5) {
-    return base::error::InternalError("");
-  }
-  if (this->output_size() != 1) {
-    return base::error::InternalError("");
-  }
-  return base::error::Success();
+  return check_inout(5, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
 }
 
 }  // namespace op

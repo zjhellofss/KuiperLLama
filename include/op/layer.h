@@ -17,6 +17,7 @@ enum class LayerType : uint8_t {
   kLayerMHA = 7,
   kLayerSoftmax = 8,
   kLayerAdd = 9,
+  kLayerSwiGLU = 10,
 };
 
 class BaseLayer {
@@ -88,6 +89,9 @@ class Layer : public BaseLayer {
 
   base::Status init() override;
 
+  base::Status check_inout(size_t in_num, size_t out_num, base::DeviceType device_type,
+                           base::DataType data_type) const;
+
   base::Status check() const override;
 
   base::Status base_forward() override;
@@ -136,6 +140,9 @@ class Layer : public BaseLayer {
 class LayerFp32Param : public Layer {
  public:
   explicit LayerFp32Param(LayerType layer_type, std::string layer_name = "");
+
+  base::Status check_weight(size_t wei_num, base::DeviceType device_type,
+                            base::DataType data_type) const;
 
   size_t weight_size() const;
 

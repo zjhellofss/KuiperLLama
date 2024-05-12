@@ -23,20 +23,10 @@ base::Status SoftmaxLayer::base_forward() {
 }
 
 base::Status SoftmaxLayer::check() const {
-  if (this->input_size() != 1) {
-    return base::error::InternalError("");
-  }
-  tensor::Tensor input = this->get_input(0);
-  if (input.is_empty()) {
-    return base::error::InternalError("");
-  }
-
-  if (this->output_size() != 1) {
-    return base::error::InternalError("");
-  }
-  tensor::Tensor output = this->get_output(0);
-  if (output.is_empty()) {
-    return base::error::InternalError("");
+  auto inout_status =
+      check_inout(1, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  if (!inout_status) {
+    return inout_status;
   }
   return base::error::Success();
 }

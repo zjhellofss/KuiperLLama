@@ -5,6 +5,7 @@
 #include "op/add.h"
 #include "op/embedding.h"
 #include "op/rope.h"
+#include "op/swiglu.h"
 namespace model {
 
 struct LLamaRawModelData {
@@ -52,6 +53,8 @@ class LLama2Model : public Model {
 
   void create_matmul_layers();
 
+  void create_swiglu_layer();
+
   tensor::Tensor& get_buffer(ModelBufferType buffer_idx) override;
 
   const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const override;
@@ -77,6 +80,7 @@ class LLama2Model : public Model {
 
   std::unique_ptr<op::VecAddLayer> add_layer_;
   std::unique_ptr<op::RoPELayer> rope_layer_;
+  std::unique_ptr<op::SwiGLULayer> swiglu_layer_;
 
   std::unique_ptr<op::MultiHeadAttention> mha_layer_;
   std::vector<std::unique_ptr<op::MatmulLayer>> wq_layers_;
@@ -87,6 +91,7 @@ class LLama2Model : public Model {
   std::vector<std::unique_ptr<op::MatmulLayer>> w1_layers_;
   std::vector<std::unique_ptr<op::MatmulLayer>> w2_layers_;
   std::vector<std::unique_ptr<op::MatmulLayer>> w3_layers_;
+  std::unique_ptr<op::MatmulLayer> cls_layer_;
 
   std::unique_ptr<op::EmbeddingLayer> embedding_layer_;
   std::vector<std::unique_ptr<op::RmsNormLayer>> rmsnorm_layers_;

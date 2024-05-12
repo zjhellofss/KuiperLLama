@@ -6,11 +6,14 @@ MatmulLayer::MatmulLayer(int32_t dim0, int32_t dim1)
 }
 
 base::Status MatmulLayer::check() const {
-  if (this->input_size() != 1) {
-    return base::error::InvalidArgument();
+  auto inout_status =
+      check_inout(1, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  if (!inout_status) {
+    return inout_status;
   }
-  if (this->output_size() != 1) {
-    return base::error::InvalidArgument();
+  auto wei_status = check_weight(1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  if (!wei_status) {
+    return wei_status;
   }
   return base::error::Success();
 }

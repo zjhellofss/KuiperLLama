@@ -36,6 +36,48 @@ base::Status Layer::base_forward() {
   return base::error::FunctionNotImplement("");
 }
 
+base::Status Layer::check_inout(size_t in_num, size_t out_num, base::DeviceType device_type,
+                                base::DataType data_type) const {
+  if (this->input_size() != in_num) {
+    return base::error::InternalError("The input number is not equal to " + std::to_string(in_num));
+  }
+  if (this->output_size() != out_num) {
+    return base::error::InternalError("The output number is not equal to " +
+                                      std::to_string(out_num));
+  }
+
+  for (int32_t i = 0; i < in_num; ++i) {
+    tensor::Tensor input = this->get_input(i);
+    if (input.is_empty()) {
+      return base::error::InternalError("The input tensor " + std::to_string(i) + " is empty.");
+    }
+    if (input.device_type() != device_type) {
+      return base::error::InternalError("The input tensor " + std::to_string(i) +
+                                        " has a wrong device type.");
+    }
+    if (input.data_type() != data_type) {
+      return base::error::InternalError("The input tensor " + std::to_string(i) +
+                                        " has a wrong data type.");
+    }
+  }
+
+  for (int32_t i = 0; i < out_num; ++i) {
+    tensor::Tensor output = this->get_output(i);
+    if (output.is_empty()) {
+      return base::error::InternalError("The output tensor " + std::to_string(i) + " is empty.");
+    }
+    if (output.device_type() != device_type) {
+      return base::error::InternalError("The output tensor " + std::to_string(i) +
+                                        " has a wrong device type.");
+    }
+    if (output.data_type() != data_type) {
+      return base::error::InternalError("The output tensor " + std::to_string(i) +
+                                        " has a wrong data type.");
+    }
+  }
+  return base::error::Success();
+}
+
 void Layer::set_input(int32_t idx, const tensor::Tensor& input) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, inputs_.size());
@@ -181,6 +223,30 @@ tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   return weights_.at(idx);
+}
+
+base::Status LayerFp32Param::check_weight(size_t wei_num, base::DeviceType device_type,
+                                          base::DataType data_type) const {
+  using namespace base;
+  if (weight_size() != wei_num) {
+    return error::InternalError("The weight num is not equal to " + std::to_string(wei_num));
+  }
+
+  for (int32_t i = 0; i < wei_num; ++i) {
+    tensor::Tensor wei = this->get_weight(i);
+    if (wei.is_empty()) {
+      return base::error::InternalError("The weight tensor " + std::to_string(i) + " is empty.");
+    }
+    if (wei.device_type() != device_type) {
+      return base::error::InternalError("The weight tensor " + std::to_string(i) +
+                                        " has a wrong device type.");
+    }
+    if (wei.data_type() != data_type) {
+      return base::error::InternalError("The weight tensor " + std::to_string(i) +
+                                        " has a wrong data type.");
+    }
+  }
+  return error::Success();
 }
 
 }  // namespace op

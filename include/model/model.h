@@ -23,14 +23,16 @@ enum class ModelBufferType {
   kValueCache = 4,
   kQuery = 5,
   kInputPos = 6,
-  kAttn = 7,
+  kScoreStorage = 7,
   kOutputMHA = 8,
   kAttnOutput = 9,
   kW1Output = 10,
   kW2Output = 11,
   kW3Output = 12,
   kFFNRMSNorm = 13,
-  kScoreStorage = 14,
+  kKeyStorage = 14,
+
+  kForwardOutput = 15,
 };
 
 class Model {

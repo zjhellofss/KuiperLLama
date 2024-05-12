@@ -95,13 +95,13 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
 
     std::shared_ptr<base::Buffer> rms_buffer = std::make_shared<base::Buffer>(
         dim_ * sizeof(float), nullptr, input_embeddings.index<float>(i * dim_), true);
-    tensor::Tensor rms_input(base::DataType::kDataTypeFp32, dim_);
-    rms_input.assign(rms_buffer);
-    rms_input.set_device_type(device_type_);
+    tensor::Tensor input(base::DataType::kDataTypeFp32, dim_);
+    input.assign(rms_buffer);
+    input.set_device_type(device_type_);
     for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
       // attn rmsnorm
       const auto& attn_norm_layer = rmsnorm_layers_.at(layer_idx);
-      forward_status = attn_norm_layer->forward_i1o1(rms_input, rms_output);
+      forward_status = attn_norm_layer->forward_i1o1(input, rms_output);
 
       if (!forward_status) {
         LOG(ERROR) << forward_status.get_err_msg();
@@ -145,14 +145,14 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
       tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
       tensor::Tensor value_cache = get_buffer(ModelBufferType::kValueCache);
 
-      tensor::Tensor attn = get_buffer(ModelBufferType::kAttn);
       tensor::Tensor mha_output = get_buffer(ModelBufferType::kOutputMHA);
+      tensor::Tensor key_storage = get_buffer(ModelBufferType::kKeyStorage);
       tensor::Tensor score_storage = get_buffer(ModelBufferType::kScoreStorage);
+
       mha_layer_->set_pos(pos);
       mha_layer_->set_layer_index(layer_idx);
-      forward_status =
-          mha_layer_->forward_i5o1(query, attn, key_cache, value_cache,
-                                   get_buffer(ModelBufferType::kScoreStorage), mha_output);
+      forward_status = mha_layer_->forward_i5o1(query, score_storage, key_cache, value_cache,
+                                                key_storage, mha_output);
       if (!forward_status) {
         LOG(ERROR) << forward_status.get_err_msg();
         return forward_status;
@@ -167,7 +167,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
       }
 
       // add
-      forward_status = add_layer_->forward_i2o1(rms_input, attn_output, rms_input);
+      forward_status = add_layer_->forward_i2o1(input, attn_output, input);
       if (!forward_status) {
         LOG(ERROR) << forward_status.get_err_msg();
         return forward_status;
@@ -176,27 +176,51 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
       // ffn rmsnorm
       const auto& ffn_norm_layer = rmsnorm_layers_.at(layer_idx + layer_num_);
       tensor::Tensor ffn_norm_output = get_buffer(ModelBufferType::kFFNRMSNorm);
-      forward_status = ffn_norm_layer->forward_i1o1(rms_input, ffn_norm_output);
+      forward_status = ffn_norm_layer->forward_i1o1(input, ffn_norm_output);
       if (!forward_status) {
         LOG(ERROR) << forward_status.get_err_msg();
         return forward_status;
       }
 
       // w1
-      tensor::Tensor w1_ouput = get_buffer(ModelBufferType::kW1Output);
-      forward_status = w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_ouput);
+      tensor::Tensor w1_output = get_buffer(ModelBufferType::kW1Output);
+      forward_status = w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_output);
       if (!forward_status) {
         LOG(ERROR) << forward_status.get_err_msg();
         return forward_status;
       }
 
+      // w3
       tensor::Tensor w3_ouput = get_buffer(ModelBufferType::kW3Output);
       forward_status = w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput);
       if (!forward_status) {
         LOG(ERROR) << forward_status.get_err_msg();
         return forward_status;
       }
+
+      // swiGLU
+      forward_status = swiglu_layer_->forward_i2o1(w1_output, w3_ouput, w1_output);
+      if (!forward_status) {
+        LOG(ERROR) << forward_status.get_err_msg();
+        return forward_status;
+      }
+
+      tensor::Tensor w2_output = get_buffer(ModelBufferType::kW2Output);
+      forward_status = w2_layers_.at(layer_idx)->forward_i1o1(w1_output, w2_output);
+
+      if (!forward_status) {
+        LOG(ERROR) << forward_status.get_err_msg();
+        return forward_status;
+      }
+
+      forward_status = add_layer_->forward_i2o1(input, w2_output, input);
+      if (!forward_status) {
+        LOG(ERROR) << forward_status.get_err_msg();
+        return forward_status;
+      }
     }
+    rmsnorm_layers_.at(2 * layer_num_)->forward_i1o1(input, input);
+    cls_layer_->forward_i1o1(input, get_buffer(ModelBufferType::kForwardOutput));
   }
   return base::error::Success();
 }
@@ -229,7 +253,6 @@ base::Status LLama2Model::gen_model_from_file() {
         "Vocabulary size mismatch between the model file and the token list.");
   }
 
-  vocab_size_ = config->vocab_size;
   raw_model_data_ = std::make_unique<LLamaRawModelData>();
   fseek(file, 0, SEEK_END);
   raw_model_data_->file_size = ftell(file);
@@ -282,6 +305,7 @@ void LLama2Model::create_embedding_layer() {
 void LLama2Model::create_matmul_layers() {
   int32_t dim = dim_;
   size_t pos = dim * std::abs(vocab_size_) + dim * layer_num_;
+  // create weight matrix for query
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wq = std::make_unique<op::MatmulLayer>(dim, dim);
     wq->reset_input_size(1);
@@ -293,6 +317,7 @@ void LLama2Model::create_matmul_layers() {
     wq_layers_.push_back(std::move(wq));
   }
 
+  // create weight matrix for key
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wk = std::make_unique<op::MatmulLayer>(kv_dim_, dim);
     wk->reset_input_size(1);
@@ -305,6 +330,7 @@ void LLama2Model::create_matmul_layers() {
     pos += kv_dim_ * dim;
   }
 
+  // create weight matrix for value
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wv = std::make_unique<op::MatmulLayer>(kv_dim_, dim);
     wv->reset_input_size(1);
@@ -316,6 +342,7 @@ void LLama2Model::create_matmul_layers() {
     pos += kv_dim_ * dim;
   }
 
+  // create weight matrix for output
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wo = std::make_unique<op::MatmulLayer>(dim, dim);
     wo->reset_input_size(1);
@@ -331,7 +358,7 @@ void LLama2Model::create_matmul_layers() {
   pos += layer_num_ * dim;
 
   // w1 layers
-  int hidden_dim = hidden_dim_;
+  int32_t hidden_dim = hidden_dim_;
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto w1 = std::make_unique<op::MatmulLayer>(hidden_dim, dim);
     w1->reset_input_size(1);
@@ -366,6 +393,15 @@ void LLama2Model::create_matmul_layers() {
     w3_layers_.push_back(std::move(w3));
     pos += dim * hidden_dim;
   }
+
+  pos += dim;
+  pos += seq_len_ * head_size_;
+  cls_layer_ = std::make_unique<op::MatmulLayer>(vocab_size_, dim);
+  cls_layer_->reset_input_size(1);
+  cls_layer_->reset_output_size(1);
+  cls_layer_->reset_weight_size(1);
+  cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos));
+  cls_layer_->get_weight(0).set_device_type(device_type_);
 }
 
 void LLama2Model::create_rmsnorm_layers() {
@@ -403,6 +439,20 @@ void LLama2Model::create_rmsnorm_layers() {
 
     rmsnorm_pos += dim_;
   }
+
+  rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
+  rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
+  rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
+
+  std::unique_ptr<op::RmsNormLayer> rms_final_layer = std::make_unique<op::RmsNormLayer>(dim_);
+  rms_final_layer->reset_input_size(1);
+  rms_final_layer->reset_output_size(1);
+  rms_final_layer->reset_weight_size(1);
+
+  const float* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
+  rms_final_layer->set_weight(0, {dim_}, weight_rmsnorm_final);
+  rms_final_layer->get_weight(0).set_device_type(device_type_);
+  rmsnorm_layers_.push_back(std::move(rms_final_layer));
 }
 
 void LLama2Model::init_mem() {
@@ -423,14 +473,16 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kOutputMHA, rms_output));
   CHECK(insert_buffer(ModelBufferType::kW2Output, rms_output));
   CHECK(insert_buffer(ModelBufferType::kFFNRMSNorm, rms_output));
+
   tensor::Tensor score_storage(base::DataType::kDataTypeFp32, head_size_, seq_len_);
   score_storage.allocate(alloc);
-  CHECK(insert_buffer(ModelBufferType::kScoreStorage, score_storage));
+  CHECK(insert_buffer(ModelBufferType::kKeyStorage, score_storage));
 
   tensor::Tensor w1_output(base::DataType::kDataTypeFp32, hidden_dim_);
   w1_output.allocate(alloc);
   tensor::Tensor w3_output(base::DataType::kDataTypeFp32, hidden_dim_);
   w3_output.allocate(alloc);
+
   CHECK(insert_buffer(ModelBufferType::kW1Output, w1_output));
   CHECK(insert_buffer(ModelBufferType::kW3Output, w3_output));
 
@@ -454,13 +506,17 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kInputPos, pos_tensor));
 
   // Attention output
-  tensor::Tensor attn(base::DataType::kDataTypeInt32, head_num_, seq_len_);
+  tensor::Tensor attn(base::DataType::kDataTypeFp32, head_num_, seq_len_);
   attn.allocate(alloc);
-  CHECK(insert_buffer(ModelBufferType::kAttn, attn));
+  CHECK(insert_buffer(ModelBufferType::kScoreStorage, attn));
 
   tensor::Tensor attn_output(base::DataType::kDataTypeFp32, dim_);
   attn_output.allocate(alloc);
   CHECK(insert_buffer(ModelBufferType::kAttnOutput, attn_output));
+
+  tensor::Tensor forward_output(base::DataType::kDataTypeFp32, vocab_size_);
+  forward_output.allocate(alloc);
+  CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
 }
 
 base::Status LLama2Model::insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor) {
@@ -526,37 +582,49 @@ base::Status LLama2Model::create_layers() {
   using namespace base;
   create_embedding_layer();
   if (!embedding_layer_) {
-    return error::InternalError("Create the embedding layer failed!");
+    return error::InternalError("Create the embedding layer for the llama model failed!");
   }
 
   create_rmsnorm_layers();
-  if (rmsnorm_layers_.size() != 2 * layer_num_) {
-    return error::InternalError("Create the rmsnorm layer failed!");
+  if (rmsnorm_layers_.size() != 2 * layer_num_ + 1) {
+    return error::InternalError("Create the rmsnorm layer for the llama model failed!");
   }
 
   create_matmul_layers();
   if (wq_layers_.size() != layer_num_ || wk_layers_.size() != layer_num_ ||
       wv_layers_.size() != layer_num_ || wo_layers_.size() != layer_num_ ||
       w1_layers_.size() != layer_num_ || w2_layers_.size() != layer_num_ ||
-      w3_layers_.size() != layer_num_) {
-    return error::InternalError("Create the matmul layer in the attention layers failed.");
+      w3_layers_.size() != layer_num_ || cls_layer_ == nullptr) {
+    return error::InternalError(
+        "Create the matmul layer in the attention layers for the llama model failed.");
   }
 
   create_rope_layer();
   if (!rope_layer_) {
-    return error::InternalError("");
+    return error::InternalError("Create the rope layer for the llama model failed!");
   }
 
   create_add_layer();
   if (!add_layer_) {
-    return error::InternalError("");
+    return error::InternalError("Create the add layer for the llama model failed!");
   }
 
   create_mha_layers();
   if (!mha_layer_) {
-    return error::InternalError("");
+    return error::InternalError("Create the mha layer for the llama model failed!");
+  }
+
+  create_swiglu_layer();
+  if (!swiglu_layer_) {
+    return error::InternalError("Create the SwiGLU layer for the llama model failed!");
   }
   return error::Success();
+}
+
+void LLama2Model::create_swiglu_layer() {
+  swiglu_layer_ = std::make_unique<op::SwiGLULayer>(hidden_dim_);
+  swiglu_layer_->reset_input_size(2);
+  swiglu_layer_->reset_output_size(1);
 }
 
 }  // namespace model
