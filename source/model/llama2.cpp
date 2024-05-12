@@ -509,10 +509,7 @@ void LLama2Model::init_mem() {
   tensor::Tensor attn(base::DataType::kDataTypeFp32, head_num_, seq_len_);
   attn.allocate(alloc);
   CHECK(insert_buffer(ModelBufferType::kScoreStorage, attn));
-
-  tensor::Tensor attn_output(base::DataType::kDataTypeFp32, dim_);
-  attn_output.allocate(alloc);
-  CHECK(insert_buffer(ModelBufferType::kAttnOutput, attn_output));
+  CHECK(insert_buffer(ModelBufferType::kAttnOutput, query));
 
   tensor::Tensor forward_output(base::DataType::kDataTypeFp32, vocab_size_);
   forward_output.allocate(alloc);
