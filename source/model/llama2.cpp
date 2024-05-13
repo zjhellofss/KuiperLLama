@@ -80,9 +80,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   tensor::Tensor pos_tensor = this->get_buffer(ModelBufferType::kInputPos);
 
   while (pos < total_steps) {
-    // set input
+    // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
-    // set pos
     tensor::Tensor input(base::DataType::kDataTypeFp32, dim_);
     if (pos < tokens.size()) {
       // prefill steps
