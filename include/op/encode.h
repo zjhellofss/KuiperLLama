@@ -11,7 +11,11 @@ class EncodeLayer : public Layer {
       bool has_bos, bool has_eos,
       std::unique_ptr<sentencepiece::SentencePieceProcessor> sentence_piece_processor);
 
-  std::vector<int32_t> encode(const std::string& sentence);
+  std::vector<int32_t> encode(const std::string& sentence) const;
+
+  std::string decode(int32_t token_id) const;
+
+  int32_t eos() const;
 
  private:
   bool has_bos_ = true;

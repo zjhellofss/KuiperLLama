@@ -10,7 +10,7 @@ base::Status RoPELayer::base_forward() {
   tensor::Tensor input_q = this->get_input(0);
   tensor::Tensor input_k = this->get_input(1);
   tensor::Tensor input_pos = this->get_input(2);
-  const int32_t pos = *input_pos.index<int32_t>(0);
+  const int32_t pos = *input_pos.ptr<int32_t>(0);
 
   for (int32_t i = 0; i < dim_; i += 2) {
     int32_t head_dim = i % head_size_;

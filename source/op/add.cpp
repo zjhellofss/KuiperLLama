@@ -1,6 +1,8 @@
 #include "op/add.h"
 #include "op/layer.h"
 namespace op {
+VecAddLayer::VecAddLayer() : Layer(LayerType::kLayerAdd, "Add") {
+}
 
 base::Status VecAddLayer::check() const {
   return check_inout(2, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
@@ -27,6 +29,4 @@ base::Status VecAddLayer::base_forward() {
   return base::error::Success();
 }
 
-VecAddLayer::VecAddLayer() : Layer(LayerType::kLayerAdd, "Add") {
-}
 }  // namespace op

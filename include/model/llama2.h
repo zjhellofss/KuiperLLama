@@ -27,12 +27,12 @@ class LLama2Model : public Model {
 
   base::Status init(base::DeviceType device_type) override;
 
-  base::Status forward(const std::vector<int>& tokens, int step_pos) override;
+  base::Status forward(const std::vector<int>& tokens, int32_t total_steps) override;
 
   std::vector<int32_t> encode(const std::string& sentence) override;
 
   std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
-                                                           size_t token_pos) override;
+                                                           int32_t token_pos) override;
 
  private:
   void init_mem() override;

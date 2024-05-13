@@ -1,10 +1,9 @@
 #ifndef LC_INCLUDE_BASE_BUFFER_H_
 #define LC_INCLUDE_BASE_BUFFER_H_
 #include <memory>
-
 #include "base/alloc.h"
 namespace base {
-class Buffer : public NoCopyable {
+class Buffer : public NoCopyable, std::enable_shared_from_this<Buffer> {
  private:
   size_t byte_size_ = 0;
   void* ptr_ = nullptr;
@@ -15,8 +14,7 @@ class Buffer : public NoCopyable {
  public:
   explicit Buffer() = default;
 
-  explicit Buffer(size_t byte_size,
-                  std::shared_ptr<DeviceAllocator> allocator = nullptr,
+  explicit Buffer(size_t byte_size, std::shared_ptr<DeviceAllocator> allocator = nullptr,
                   void* ptr = nullptr, bool use_external = false);
 
   virtual ~Buffer();
@@ -38,6 +36,8 @@ class Buffer : public NoCopyable {
   DeviceType device_type() const;
 
   void set_device_type(DeviceType device_type);
+
+  std::shared_ptr<Buffer> get_shared_from_this();
 };
 }  // namespace base
 

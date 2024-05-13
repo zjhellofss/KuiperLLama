@@ -61,10 +61,13 @@ class Tensor {
   bool allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool need_realloc = false);
 
   template <typename T>
-  T* index(int64_t index);
+  T* ptr(int64_t index);
 
   template <typename T>
-  const T* index(int64_t index) const;
+  const T* ptr(int64_t index) const;
+
+  template <typename T>
+  T& index(int64_t offset);
 
   template <typename T>
   void transpose_dim12(Tensor dst);
@@ -75,6 +78,12 @@ class Tensor {
   std::shared_ptr<base::Buffer> buffer_;
   base::DataType data_type_ = base::DataType::kDataTypeUnknown;
 };
+
+template <typename T>
+T& Tensor::index(int64_t offset) {
+  T& val = *(reinterpret_cast<T*>(buffer_->ptr()) + offset);
+  return val;
+}
 
 template <typename T>
 const T* Tensor::ptr() const {
@@ -93,14 +102,14 @@ T* Tensor::ptr() {
 }
 
 template <typename T>
-T* Tensor::index(int64_t index) {
+T* Tensor::ptr(int64_t index) {
   CHECK(buffer_ != nullptr && buffer_->ptr() != nullptr)
       << "The data area buffer of this tensor is empty or it points to a null pointer.";
   return const_cast<T*>(reinterpret_cast<const T*>(buffer_->ptr())) + index;
 }
 
 template <typename T>
-const T* Tensor::index(int64_t index) const {
+const T* Tensor::ptr(int64_t index) const {
   CHECK(buffer_ != nullptr && buffer_->ptr() != nullptr)
       << "The data area buffer of this tensor is empty or it points to a null pointer.";
   return reinterpret_cast<const T*>(buffer_->ptr()) + index;

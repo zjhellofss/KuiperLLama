@@ -92,12 +92,12 @@ base::Status EmbeddingLayer::base_forward() {
     return base::error::InternalError("Get the memory allocator failed.");
   }
   for (int32_t i = 0; i < input_num; ++i) {
-    int32_t token = *input_tensor.index<int32_t>(i);
+    int32_t token = *input_tensor.ptr<int32_t>(i);
     if (token > vocab_size_) {
       return base::error::InternalError("Token is greater than vocab size.");
     }
-    void* dest_ptr = (void*)output_tensor.index<float>(i * weight_dim);
-    const void* src_ptr = (void*)weight_tensor.index<float>(token * weight_dim);
+    void* dest_ptr = (void*)output_tensor.ptr<float>(i * weight_dim);
+    const void* src_ptr = (void*)weight_tensor.ptr<float>(token * weight_dim);
     if (!dest_ptr || !src_ptr) {
       return base::error::InternalError("Invalid src or dest pointer.");
     }

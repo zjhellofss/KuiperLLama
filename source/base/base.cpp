@@ -9,7 +9,7 @@ Status& Status::operator=(int code) {
   return *this;
 };
 
-bool Status::operator==(int code) {
+bool Status::operator==(int code) const {
   if (code_ == code) {
     return true;
   } else {
@@ -17,7 +17,7 @@ bool Status::operator==(int code) {
   }
 };
 
-bool Status::operator!=(int code) {
+bool Status::operator!=(int code) const {
   if (code_ != code) {
     return true;
   } else {
@@ -25,11 +25,11 @@ bool Status::operator!=(int code) {
   }
 };
 
-Status::operator int() {
+Status::operator int() const {
   return code_;
 }
 
-Status::operator bool() {
+Status::operator bool() const {
   return code_ == kSuccess;
 }
 

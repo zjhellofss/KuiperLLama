@@ -41,7 +41,6 @@ base::Status MultiHeadAttention::base_forward() {
     }
 
     score = (query * key_mat) / std::sqrt(static_cast<float>(head_size_));
-
     auto score_head_buffer =
         std::make_shared<base::Buffer>((pos_ + 1) * sizeof(float), nullptr, score_head_addr, true);
     score_head_buffer->set_device_type(base::DeviceType::kDeviceCPU);

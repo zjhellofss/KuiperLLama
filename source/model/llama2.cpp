@@ -5,9 +5,6 @@
 #include <sys/mman.h>
 #include <utility>
 #include "base/tick.h"
-#include "op/embedding.h"
-#include "op/matmul.h"
-
 namespace model {
 LLamaRawModelData::~LLamaRawModelData() {
   if (data != nullptr && data != MAP_FAILED) {
@@ -65,85 +62,71 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   return error::Success();
 }
 
-base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) {
+base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_steps) {
+  CHECK(device_type_ == base::DeviceType::kDeviceCPU);
   auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
-  int32_t* input_tokens_ptr = input_tokens.ptr<int32_t>();
-  if (!input_tokens_ptr) {
-    return base::error::InternalError(
-        "Can't get the input token pointer in the forward_i1o1 function.");
+  for (int32_t i = 0; i < tokens.size(); ++i) {
+    input_tokens.index<int32_t>(i) = tokens.at(i);
   }
-  for (const int& token : tokens) {
-    *input_tokens_ptr = token;
-    input_tokens_ptr += 1;
-  }
+
   auto input_token_num =
       tensor::Tensor(base::DataType::kDataTypeInt32, static_cast<int32_t>(tokens.size()));
+  StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
 
-  auto forward_status =
-      embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings);
-  if (!forward_status) {
-    LOG(ERROR) << forward_status.get_err_msg();
-    return forward_status;
-  }
+  int32_t pos = 0;
+  int32_t next = -1;
+  int32_t eos = this->encode_layer_->eos();
+  tensor::Tensor pos_tensor = this->get_buffer(ModelBufferType::kInputPos);
 
-  auto rms_output = get_buffer(ModelBufferType::kOutputRMSNorm);
-  for (int32_t i = 0; i < tokens.size(); ++i) {
-    int32_t pos = step_pos + i;
-    tensor::Tensor pos_tensor = this->get_buffer(ModelBufferType::kInputPos);
-    *pos_tensor.index<int32_t>(0) = pos;
-
-    std::shared_ptr<base::Buffer> rms_buffer = std::make_shared<base::Buffer>(
-        dim_ * sizeof(float), nullptr, input_embeddings.index<float>(i * dim_), true);
+  while (pos < total_steps) {
+    // set input
+    pos_tensor.index<int32_t>(0) = pos;
+    // set pos
     tensor::Tensor input(base::DataType::kDataTypeFp32, dim_);
-    input.assign(rms_buffer);
+    if (pos < tokens.size()) {
+      // prefill steps
+      std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
+          dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(pos * dim_), true);
+      input.assign(input_emb_buffer);
+    } else {
+      // generate steps
+      CHECK_NE(next, -1);
+      input_token_num.reshape({1});
+      input_tokens.index<int32_t>(0) = next;
+      StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
+
+      std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
+          dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
+      input.assign(input_emb_buffer);
+    }
+
     input.set_device_type(device_type_);
     for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
       // attn rmsnorm
-      const auto& attn_norm_layer = rmsnorm_layers_.at(layer_idx);
-      forward_status = attn_norm_layer->forward_i1o1(input, rms_output);
-
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      auto rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
+      StatusCheck(rmsnorm_layers_.at(layer_idx)->forward_i1o1(input, rmsnorm_output));
 
       // kv cache
       tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
-      if (query.size() != dim_) {
-        return base::error::InternalError("The query dim is not equal to dim.");
-      }
-
       // wq wk wv @ input
       const auto& [key, val] = slice_kv_cache(layer_idx, pos);
-      forward_status = wq_layers_.at(layer_idx)->forward_i1o1(rms_output, query);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      // query
+      StatusCheck(wq_layers_.at(layer_idx)->forward_i1o1(
+          get_buffer(ModelBufferType::kOutputRMSNorm), query));
 
-      forward_status = wk_layers_.at(layer_idx)->forward_i1o1(rms_output, key);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      // key
+      StatusCheck(wk_layers_.at(layer_idx)->forward_i1o1(rmsnorm_output, key));
 
-      forward_status = wv_layers_.at(layer_idx)->forward_i1o1(rms_output, val);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      // value
+      StatusCheck(wv_layers_.at(layer_idx)->forward_i1o1(rmsnorm_output, val));
 
       // rope
-      forward_status = rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{});
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      StatusCheck(rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
 
       // mha
       tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
-      tensor::Tensor value_cache = get_buffer(ModelBufferType::kValueCache);
+      tensor::Tensor val_cache = get_buffer(ModelBufferType::kValueCache);
 
       tensor::Tensor mha_output = get_buffer(ModelBufferType::kOutputMHA);
       tensor::Tensor key_storage = get_buffer(ModelBufferType::kKeyStorage);
@@ -151,77 +134,59 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int step_pos) 
 
       mha_layer_->set_pos(pos);
       mha_layer_->set_layer_index(layer_idx);
-      forward_status = mha_layer_->forward_i5o1(query, score_storage, key_cache, value_cache,
-                                                key_storage, mha_output);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      StatusCheck(mha_layer_->forward_i5o1(query, score_storage, key_cache, val_cache, key_storage,
+                                           mha_output));
 
       // wo @ attention output
       tensor::Tensor attn_output = get_buffer(ModelBufferType::kAttnOutput);
-      forward_status = wo_layers_.at(layer_idx)->forward_i1o1(mha_output, attn_output);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      StatusCheck(wo_layers_.at(layer_idx)->forward_i1o1(mha_output, attn_output));
 
-      // add
-      forward_status = add_layer_->forward_i2o1(input, attn_output, input);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      // residual add
+      StatusCheck(add_layer_->forward_i2o1(input, attn_output, input));
 
       // ffn rmsnorm
-      const auto& ffn_norm_layer = rmsnorm_layers_.at(layer_idx + layer_num_);
       tensor::Tensor ffn_norm_output = get_buffer(ModelBufferType::kFFNRMSNorm);
-      forward_status = ffn_norm_layer->forward_i1o1(input, ffn_norm_output);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      StatusCheck(rmsnorm_layers_.at(layer_idx + layer_num_)->forward_i1o1(input, ffn_norm_output));
 
       // w1
       tensor::Tensor w1_output = get_buffer(ModelBufferType::kW1Output);
-      forward_status = w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_output);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      StatusCheck(w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_output));
 
       // w3
       tensor::Tensor w3_ouput = get_buffer(ModelBufferType::kW3Output);
-      forward_status = w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      StatusCheck(w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput));
 
-      // swiGLU
-      forward_status = swiglu_layer_->forward_i2o1(w1_output, w3_ouput, w1_output);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      // SwiGLU
+      StatusCheck(swiglu_layer_->forward_i2o1(w1_output, w3_ouput, w1_output));
 
+      // w2
       tensor::Tensor w2_output = get_buffer(ModelBufferType::kW2Output);
-      forward_status = w2_layers_.at(layer_idx)->forward_i1o1(w1_output, w2_output);
+      StatusCheck(w2_layers_.at(layer_idx)->forward_i1o1(w1_output, w2_output));
 
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
-
-      forward_status = add_layer_->forward_i2o1(input, w2_output, input);
-      if (!forward_status) {
-        LOG(ERROR) << forward_status.get_err_msg();
-        return forward_status;
-      }
+      // residual add
+      StatusCheck(add_layer_->forward_i2o1(input, w2_output, input));
     }
-    rmsnorm_layers_.at(2 * layer_num_)->forward_i1o1(input, input);
-    cls_layer_->forward_i1o1(input, get_buffer(ModelBufferType::kForwardOutput));
+    StatusCheck(rmsnorm_layers_.at(2 * layer_num_)->forward_i1o1(input, input));
+    tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
+    StatusCheck(cls_layer_->forward_i1o1(input, forward_output));
+
+    const float* forward_output_ptr = forward_output.ptr<float>();
+    if (pos < tokens.size() - 1) {
+      next = tokens[pos + 1];
+    } else {
+      next = (int32_t)std::distance(
+          forward_output_ptr,
+          std::max_element(forward_output_ptr, forward_output_ptr + forward_output.size()));
+    }
+
+    std::string output_str = this->encode_layer_->decode(next);
+    std::cout << output_str << " " << std::flush;
+    if (next == eos) {
+      break;
+    }
+    pos += 1;
   }
+  std::cout << "\n";
   return base::error::Success();
 }
 
@@ -456,7 +421,6 @@ void LLama2Model::create_rmsnorm_layers() {
 }
 
 void LLama2Model::init_mem() {
-  CHECK(device_type_ == base::DeviceType::kDeviceCPU);
   auto alloc = base::CPUDeviceAllocatorFactory::get_instance();
   int32_t max_seq_len = seq_len_;
   tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, static_cast<int32_t>(max_seq_len));
@@ -511,6 +475,7 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kScoreStorage, attn));
   CHECK(insert_buffer(ModelBufferType::kAttnOutput, query));
 
+  // final forward output
   tensor::Tensor forward_output(base::DataType::kDataTypeFp32, vocab_size_);
   forward_output.allocate(alloc);
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
@@ -520,10 +485,10 @@ base::Status LLama2Model::insert_buffer(ModelBufferType buffer_idx, const tensor
   if (buffers_.count(buffer_idx) > 0) {
     return base::error::KeyHasExits(std::to_string(int(buffer_idx)) + " has exits in the buffers");
   }
-  buffers_.insert({buffer_idx, tensor});
   if (tensor.is_empty()) {
     return base::error::InvalidArgument("The tensor is empty for inserting buffer.");
   }
+  buffers_.insert({buffer_idx, tensor});
   return base::error::Success();
 }
 
@@ -538,15 +503,17 @@ const tensor::Tensor& LLama2Model::get_buffer(ModelBufferType buffer_idx) const 
 }
 
 std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
-                                                                      size_t token_pos) {
+                                                                      int32_t token_pos) {
   int32_t layer_offset = layer_idx * seq_len_ * kv_dim_;
-  float* key_cache_ptr = get_buffer(ModelBufferType::kKeyCache).ptr<float>();
-  float* val_cache_ptr = get_buffer(ModelBufferType::kValueCache).ptr<float>();
+  int32_t cache_offset = static_cast<int32_t>(layer_offset + token_pos * kv_dim_);
 
-  auto key_cache = std::make_shared<base::Buffer>(
-      kv_dim_ * sizeof(float), nullptr, key_cache_ptr + layer_offset + token_pos * kv_dim_, true);
-  auto val_cache = std::make_shared<base::Buffer>(
-      kv_dim_ * sizeof(float), nullptr, val_cache_ptr + layer_offset + token_pos * kv_dim_, true);
+  float* key_cache_ptr = get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset);
+  float* val_cache_ptr = get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset);
+
+  auto key_cache =
+      std::make_shared<base::Buffer>(kv_dim_ * sizeof(float), nullptr, key_cache_ptr, true);
+  auto val_cache =
+      std::make_shared<base::Buffer>(kv_dim_ * sizeof(float), nullptr, val_cache_ptr, true);
   key_cache->set_device_type(device_type_);
   val_cache->set_device_type(device_type_);
   tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim_);
@@ -584,16 +551,21 @@ base::Status LLama2Model::create_layers() {
 
   create_rmsnorm_layers();
   if (rmsnorm_layers_.size() != 2 * layer_num_ + 1) {
-    return error::InternalError("Create the rmsnorm layer for the llama model failed!");
+    return error::InternalError("Create the rmsnorm layers for the llama model failed!");
   }
 
   create_matmul_layers();
   if (wq_layers_.size() != layer_num_ || wk_layers_.size() != layer_num_ ||
-      wv_layers_.size() != layer_num_ || wo_layers_.size() != layer_num_ ||
-      w1_layers_.size() != layer_num_ || w2_layers_.size() != layer_num_ ||
-      w3_layers_.size() != layer_num_ || cls_layer_ == nullptr) {
+      wv_layers_.size() != layer_num_ || wo_layers_.size() != layer_num_) {
     return error::InternalError(
-        "Create the matmul layer in the attention layers for the llama model failed.");
+        "Create the matmul layer in the attention and ffn attention layers for the llama model "
+        "failed.");
+  }
+
+  if (w1_layers_.size() != layer_num_ || w2_layers_.size() != layer_num_ ||
+      w3_layers_.size() != layer_num_) {
+    return error::InternalError(
+        "Create the matmul layer in the feedforward layers for the llama model failed.");
   }
 
   create_rope_layer();
