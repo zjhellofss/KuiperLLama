@@ -1,8 +1,8 @@
 #include "op/rmsnorm.h"
 #include <armadillo>
 namespace op {
-RmsNormLayer::RmsNormLayer(int32_t dim)
-    : LayerFp32Param(LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
+RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
+    : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
 }
 
 base::Status RmsNormLayer::base_forward() {

@@ -1,14 +1,14 @@
 #include "op/mha.h"
 namespace op {
-MultiHeadAttention::MultiHeadAttention(int32_t kv_mul, int32_t kv_dim, int32_t seq_len,
-                                       int32_t head_num, int32_t head_size)
-    : Layer(LayerType::kLayerMHA, "MultiHead"),
+MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t kv_mul, int32_t kv_dim,
+                                       int32_t seq_len, int32_t head_num, int32_t head_size)
+    : Layer(device_type, LayerType::kLayerMHA, "MultiHead"),
       kv_mul_(kv_mul),
       kv_dim_(kv_dim),
       seq_len_(seq_len),
       head_num_(head_num),
       head_size_(head_size) {
-  softmax_ = std::make_unique<op::SoftmaxLayer>();
+  softmax_ = std::make_unique<op::SoftmaxLayer>(device_type);
   softmax_->reset_input_size(1);
   softmax_->reset_output_size(1);
 }

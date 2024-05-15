@@ -1,11 +1,12 @@
 #include "op/embedding.h"
 #include "op/layer.h"
 namespace op {
-EmbeddingLayer::EmbeddingLayer(int32_t dim, int32_t seq_len, int32_t vocab_size)
+EmbeddingLayer::EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_t seq_len,
+                               int32_t vocab_size)
     : dim_(dim),
       seq_len_(seq_len),
       vocab_size_(vocab_size),
-      LayerFp32Param(LayerType::kLayerEmbedding, "Embedding") {
+      LayerFp32Param(device_type, LayerType::kLayerEmbedding, "Embedding") {
 }
 
 base::Status EmbeddingLayer::check() const {
@@ -23,7 +24,7 @@ base::Status EmbeddingLayer::check() const {
   if (input_tensor.is_empty()) {
     return base::error::InvalidArgument("The input tensor is empty.");
   }
-  if (input_tensor.device_type() != base::DeviceType::kDeviceCPU) {
+  if (input_tensor.device_type() != device_type_) {
     return base::error::InvalidArgument("The input tensor has a wrong device type.");
   }
   const auto& input_num = this->get_input(1).size();
@@ -36,17 +37,16 @@ base::Status EmbeddingLayer::check() const {
   if (input_tensor.get_dim(0) != seq_len_) {
     return base::error::InvalidArgument("The dim0 of input tensor is not equal to the seq len.");
   }
+  if (input_tensor.data_type() != base::DataType::kDataTypeInt32) {
+    return base::error::InvalidArgument("The input tensor 1 has a wrong data type.");
+  }
 
   const auto& weight_tensor = this->get_weight(0);
-  if (weight_tensor.is_empty()) {
-    return base::error::InvalidArgument("The output tensor is empty.");
+  auto status = check_weight(1, device_type_, base::DataType::kDataTypeFp32);
+  if (!status) {
+    return status;
   }
-  if (weight_tensor.device_type() != base::DeviceType::kDeviceCPU) {
-    return base::error::InvalidArgument("The weight tensor has a wrong device type.");
-  }
-  if (weight_tensor.ptr<float>() == nullptr) {
-    return base::error::InvalidArgument("The weight tensor is nullptr.");
-  }
+
   if (weight_tensor.get_dim(0) != vocab_size_) {
     return base::error::InvalidArgument(
         "The dim0 of weight tensor is not equal to the vocab size.");
@@ -59,7 +59,7 @@ base::Status EmbeddingLayer::check() const {
   if (output_tensor.is_empty()) {
     return base::error::InvalidArgument("The output tensor is empty.");
   }
-  if (output_tensor.device_type() != base::DeviceType::kDeviceCPU) {
+  if (output_tensor.device_type() != device_type_) {
     return base::error::InvalidArgument("The output tensor has a wrong device type.");
   }
   if (output_tensor.ptr<float>() == nullptr) {

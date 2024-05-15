@@ -1,6 +1,7 @@
 #include "op/softmax.h"
 namespace op {
-SoftmaxLayer::SoftmaxLayer() : Layer(LayerType::kLayerSoftmax, "Softmax") {
+SoftmaxLayer::SoftmaxLayer(base::DeviceType device_type)
+    : Layer(device_type, LayerType::kLayerSoftmax, "Softmax") {
 }
 
 base::Status SoftmaxLayer::base_forward() {

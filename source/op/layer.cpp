@@ -4,8 +4,12 @@
 #include <utility>
 
 namespace op {
-BaseLayer::BaseLayer(LayerType layer_type, base::DataType data_type, std::string layer_name)
-    : layer_type_(layer_type), data_type_(data_type), layer_name_(std::move(layer_name)) {
+BaseLayer::BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type,
+                     std::string layer_name)
+    : device_type_(device_type),
+      layer_type_(layer_type),
+      data_type_(data_type),
+      layer_name_(std::move(layer_name)) {
 }
 
 base::DataType BaseLayer::data_type() const {
@@ -23,9 +27,16 @@ const std::string& BaseLayer::get_layer_name() const {
 void BaseLayer::set_layer_name(const std::string& layer_name) {
   layer_name_ = layer_name;
 }
+base::DeviceType BaseLayer::device_type() const {
+  return device_type_;
+}
 
-Layer::Layer(LayerType layer_type, std::string layer_name)
-    : BaseLayer(layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
+void BaseLayer::set_device_type(base::DeviceType device_type) {
+  device_type_ = device_type;
+}
+
+Layer::Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name)
+    : BaseLayer(device_type, layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
 }
 
 base::Status Layer::init() {
@@ -134,8 +145,9 @@ size_t Layer::output_size() const {
   return outputs_.size();
 }
 
-LayerFp32Param::LayerFp32Param(LayerType layer_type, std::string layer_name)
-    : Layer(layer_type, std::move(layer_name)) {
+LayerFp32Param::LayerFp32Param(base::DeviceType device_type, LayerType layer_type,
+                               std::string layer_name)
+    : Layer(device_type, layer_type, std::move(layer_name)) {
 }
 
 void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {

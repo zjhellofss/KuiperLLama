@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "base/base.h"
 #include "tensor/tensor.h"
 
 namespace op {
@@ -22,7 +23,8 @@ enum class LayerType : uint8_t {
 
 class BaseLayer {
  public:
-  explicit BaseLayer(LayerType layer_type, base::DataType data_type, std::string layer_name = "");
+  explicit BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type,
+                     std::string layer_name = "");
 
   base::DataType data_type() const;
 
@@ -77,15 +79,20 @@ class BaseLayer {
 
   void set_layer_name(const std::string& layer_name);
 
- private:
+  base::DeviceType device_type() const;
+
+  void set_device_type(base::DeviceType device_type);
+
+ protected:
   std::string layer_name_;
-  base::DataType data_type_ = base::DataType::kDataTypeUnknown;
   LayerType layer_type_ = LayerType::kLayerUnknown;
+  base::DataType data_type_ = base::DataType::kDataTypeUnknown;
+  base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;
 };
 
 class Layer : public BaseLayer {
  public:
-  explicit Layer(LayerType layer_type, std::string layer_name = "");
+  explicit Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name = "");
 
   base::Status init() override;
 
@@ -135,11 +142,13 @@ class Layer : public BaseLayer {
  private:
   std::vector<tensor::Tensor> inputs_;
   std::vector<tensor::Tensor> outputs_;
+  base::DeviceType device_type() const;
 };
 
 class LayerFp32Param : public Layer {
  public:
-  explicit LayerFp32Param(LayerType layer_type, std::string layer_name = "");
+  explicit LayerFp32Param(base::DeviceType device_type, LayerType layer_type,
+                          std::string layer_name = "");
 
   base::Status check_weight(size_t wei_num, base::DeviceType device_type,
                             base::DataType data_type) const;

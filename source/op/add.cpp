@@ -1,11 +1,12 @@
 #include "op/add.h"
 #include "op/layer.h"
 namespace op {
-VecAddLayer::VecAddLayer() : Layer(LayerType::kLayerAdd, "Add") {
+VecAddLayer::VecAddLayer(base::DeviceType device_type)
+    : Layer(device_type, LayerType::kLayerAdd, "Add") {
 }
 
 base::Status VecAddLayer::check() const {
-  return check_inout(2, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  return check_inout(2, 1, device_type_, base::DataType::kDataTypeFp32);
 }
 
 base::Status VecAddLayer::base_forward() {

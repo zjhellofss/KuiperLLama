@@ -39,19 +39,19 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
     return error::PathNotValid(token_path_);
   }
 
-  auto sentence_piece_processor = std::make_unique<sentencepiece::SentencePieceProcessor>();
-  const auto& status = sentence_piece_processor->Load(token_path_);
+  auto spe = std::make_unique<sentencepiece::SentencePieceProcessor>();
+  const auto& status = spe->Load(token_path_);
   if (!status.ok()) {
     return error::PathNotValid(token_path_);
   }
 
-  vocab_size_ = sentence_piece_processor->GetPieceSize();
+  vocab_size_ = spe->GetPieceSize();
   if (vocab_size_ <= 0) {
     return error::ModelParseError("The vocab size param read error from the model file!");
   }
   device_type_ = device_type;
-  encode_layer_ =
-      std::make_unique<op::EncodeLayer>(true, false, std::move(sentence_piece_processor));
+  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false,
+                                                    std::move(spe));
 
   Status read_status = gen_model_from_file();
   if (!read_status) {
@@ -256,7 +256,8 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
 }
 
 void LLama2Model::create_embedding_layer() {
-  embedding_layer_ = std::make_unique<op::EmbeddingLayer>(dim_, seq_len_, std::abs(vocab_size_));
+  embedding_layer_ =
+      std::make_unique<op::EmbeddingLayer>(device_type_, dim_, seq_len_, std::abs(vocab_size_));
 
   const float* weight_embedding = raw_model_data_->weight(0);
   embedding_layer_->reset_weight_size(1);
@@ -271,7 +272,7 @@ void LLama2Model::create_matmul_layers() {
   size_t pos = dim * std::abs(vocab_size_) + dim * layer_num_;
   // create weight matrix for query
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto wq = std::make_unique<op::MatmulLayer>(dim, dim);
+    auto wq = std::make_unique<op::MatmulLayer>(device_type_, dim, dim);
     wq->reset_input_size(1);
     wq->reset_output_size(1);
     wq->reset_weight_size(1);
@@ -283,7 +284,7 @@ void LLama2Model::create_matmul_layers() {
 
   // create weight matrix for key
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto wk = std::make_unique<op::MatmulLayer>(kv_dim_, dim);
+    auto wk = std::make_unique<op::MatmulLayer>(device_type_, kv_dim_, dim);
     wk->reset_input_size(1);
     wk->reset_output_size(1);
     wk->reset_weight_size(1);
@@ -296,7 +297,7 @@ void LLama2Model::create_matmul_layers() {
 
   // create weight matrix for value
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto wv = std::make_unique<op::MatmulLayer>(kv_dim_, dim);
+    auto wv = std::make_unique<op::MatmulLayer>(device_type_, kv_dim_, dim);
     wv->reset_input_size(1);
     wv->reset_output_size(1);
     wv->reset_weight_size(1);
@@ -308,7 +309,7 @@ void LLama2Model::create_matmul_layers() {
 
   // create weight matrix for output
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto wo = std::make_unique<op::MatmulLayer>(dim, dim);
+    auto wo = std::make_unique<op::MatmulLayer>(device_type_, dim, dim);
     wo->reset_input_size(1);
     wo->reset_output_size(1);
     wo->reset_weight_size(1);
@@ -324,7 +325,7 @@ void LLama2Model::create_matmul_layers() {
   // w1 layers
   int32_t hidden_dim = hidden_dim_;
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto w1 = std::make_unique<op::MatmulLayer>(hidden_dim, dim);
+    auto w1 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim);
     w1->reset_input_size(1);
     w1->reset_output_size(1);
     w1->reset_weight_size(1);
@@ -336,7 +337,7 @@ void LLama2Model::create_matmul_layers() {
 
   // w2 layers
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto w2 = std::make_unique<op::MatmulLayer>(dim, hidden_dim);
+    auto w2 = std::make_unique<op::MatmulLayer>(device_type_, dim, hidden_dim);
     w2->reset_input_size(1);
     w2->reset_output_size(1);
     w2->reset_weight_size(1);
@@ -348,7 +349,7 @@ void LLama2Model::create_matmul_layers() {
 
   // w3 layers
   for (int32_t i = 0; i < layer_num_; ++i) {
-    auto w3 = std::make_unique<op::MatmulLayer>(hidden_dim, dim);
+    auto w3 = std::make_unique<op::MatmulLayer>(device_type_, hidden_dim, dim);
     w3->reset_input_size(1);
     w3->reset_output_size(1);
     w3->reset_weight_size(1);
@@ -360,7 +361,7 @@ void LLama2Model::create_matmul_layers() {
 
   pos += dim;
   pos += seq_len_ * head_size_;
-  cls_layer_ = std::make_unique<op::MatmulLayer>(vocab_size_, dim);
+  cls_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size_, dim);
   cls_layer_->reset_input_size(1);
   cls_layer_->reset_output_size(1);
   cls_layer_->reset_weight_size(1);
@@ -372,7 +373,8 @@ void LLama2Model::create_rmsnorm_layers() {
   size_t rmsnorm_pos = dim_ * std::abs(vocab_size_);
 
   for (int32_t i = 0; i < layer_num_; ++i) {
-    std::unique_ptr<op::RmsNormLayer> rms_norm_layer = std::make_unique<op::RmsNormLayer>(dim_);
+    std::unique_ptr<op::RmsNormLayer> rms_norm_layer =
+        std::make_unique<op::RmsNormLayer>(device_type_, dim_);
     rms_norm_layer->reset_input_size(1);
     rms_norm_layer->reset_output_size(1);
     rms_norm_layer->reset_weight_size(1);
@@ -391,7 +393,8 @@ void LLama2Model::create_rmsnorm_layers() {
   rmsnorm_pos += layer_num_ * dim_ * dim_;
 
   for (int32_t i = 0; i < layer_num_; ++i) {
-    std::unique_ptr<op::RmsNormLayer> rms_norm_layer = std::make_unique<op::RmsNormLayer>(dim_);
+    std::unique_ptr<op::RmsNormLayer> rms_norm_layer =
+        std::make_unique<op::RmsNormLayer>(device_type_, dim_);
     rms_norm_layer->reset_input_size(1);
     rms_norm_layer->reset_output_size(1);
     rms_norm_layer->reset_weight_size(1);
@@ -408,7 +411,7 @@ void LLama2Model::create_rmsnorm_layers() {
   rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
   rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
 
-  std::unique_ptr<op::RmsNormLayer> rms_final_layer = std::make_unique<op::RmsNormLayer>(dim_);
+  std::unique_ptr<op::RmsNormLayer> rms_final_layer = std::make_unique<op::RmsNormLayer>(device_type_,dim_);
   rms_final_layer->reset_input_size(1);
   rms_final_layer->reset_output_size(1);
   rms_final_layer->reset_weight_size(1);
@@ -523,20 +526,20 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
 }
 
 void LLama2Model::create_rope_layer() {
-  rope_layer_ = std::make_unique<op::RoPELayer>(dim_, kv_dim_, head_size_);
+  rope_layer_ = std::make_unique<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
   rope_layer_->reset_input_size(3);
   rope_layer_->reset_output_size(1);
 }
 
 void LLama2Model::create_mha_layers() {
-  mha_layer_ =
-      std::make_unique<op::MultiHeadAttention>(kv_mul_, kv_dim_, seq_len_, head_num_, head_size_);
+  mha_layer_ = std::make_unique<op::MultiHeadAttention>(device_type_, kv_mul_, kv_dim_, seq_len_,
+                                                        head_num_, head_size_);
   mha_layer_->reset_input_size(5);
   mha_layer_->reset_output_size(1);
 }
 
 void LLama2Model::create_add_layer() {
-  add_layer_ = std::make_unique<op::VecAddLayer>();
+  add_layer_ = std::make_unique<op::VecAddLayer>(device_type_);
   add_layer_->reset_input_size(2);
   add_layer_->reset_output_size(1);
 }
@@ -590,7 +593,7 @@ base::Status LLama2Model::create_layers() {
 }
 
 void LLama2Model::create_swiglu_layer() {
-  swiglu_layer_ = std::make_unique<op::SwiGLULayer>(hidden_dim_);
+  swiglu_layer_ = std::make_unique<op::SwiGLULayer>(device_type_, hidden_dim_);
   swiglu_layer_->reset_input_size(2);
   swiglu_layer_->reset_output_size(1);
 }

@@ -1,8 +1,12 @@
 #include "op/swiglu.h"
 #include "op/layer.h"
 namespace op {
+SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)
+    : Layer(device_type, op::LayerType::kLayerSwiGLU, "SwiGLU"), hidden_dim_(hidden_dim) {
+}
+
 base::Status SwiGLULayer::check() const {
-  auto status = check_inout(2, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  auto status = check_inout(2, 1, device_type_, base::DataType::kDataTypeFp32);
   if (!status) {
     return status;
   }
@@ -34,10 +38,6 @@ base::Status SwiGLULayer::base_forward() {
   input1_vec %= (1.0f / (1.0f + arma::exp(-input1_vec)));
   input1_vec %= input2_vec;
   return base::error::Success();
-}
-
-SwiGLULayer::SwiGLULayer(int32_t hidden_dim)
-    : Layer(op::LayerType::kLayerSwiGLU, "SwiGLU"), hidden_dim_(hidden_dim) {
 }
 
 }  // namespace op

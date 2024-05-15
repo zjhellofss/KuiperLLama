@@ -1,6 +1,13 @@
 #include "op/rope.h"
 #include <cmath>
 namespace op {
+RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_size)
+    : Layer(device_type, LayerType::kLayerRoPe, "RoPe"),
+      dim_(dim),
+      kv_dim_(kv_dim),
+      head_size_(head_size) {
+}
+
 base::Status RoPELayer::base_forward() {
   base::Status status = check();
   if (!status) {
@@ -40,10 +47,6 @@ base::Status RoPELayer::check() const {
     return base::error::InternalError("The output number is not equal to " + std::to_string(1));
   }
   return base::error::Success();
-}
-
-RoPELayer::RoPELayer(int32_t dim, int32_t kv_dim, int32_t head_size)
-    : Layer(LayerType::kLayerRoPe, "RoPe"), dim_(dim), kv_dim_(kv_dim), head_size_(head_size) {
 }
 
 }  // namespace op

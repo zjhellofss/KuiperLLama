@@ -4,7 +4,7 @@
 namespace op {
 class SoftmaxLayer : public Layer {
  public:
-  explicit SoftmaxLayer();
+  explicit SoftmaxLayer(base::DeviceType device_type);
 
   base::Status check() const override;
 
