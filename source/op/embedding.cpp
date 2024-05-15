@@ -87,6 +87,7 @@ base::Status EmbeddingLayer::base_forward() {
   const int32_t weight_dim = weight_tensor.get_dim(1);
   const auto& output_tensor = get_output(0);
 
+  CHECK(device_type_ == base::DeviceType::kDeviceCPU);
   const auto allocator = base::CPUDeviceAllocatorFactory::get_instance();
   if (!allocator) {
     return base::error::InternalError("Get the memory allocator failed.");

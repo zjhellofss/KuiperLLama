@@ -40,13 +40,7 @@ base::Status RoPELayer::base_forward() {
 }
 
 base::Status RoPELayer::check() const {
-  if (this->input_size() != 3) {
-    return base::error::InternalError("The input number is not equal to " + std::to_string(3));
-  }
-  if (this->output_size() != 1) {
-    return base::error::InternalError("The output number is not equal to " + std::to_string(1));
-  }
-  return base::error::Success();
+  return check_inout(3, 1, device_type_, base::DataType::kDataTypeFp32);
 }
 
 }  // namespace op

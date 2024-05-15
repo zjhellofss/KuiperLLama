@@ -25,7 +25,7 @@ base::Status SoftmaxLayer::base_forward() {
 
 base::Status SoftmaxLayer::check() const {
   auto inout_status =
-      check_inout(1, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+      check_inout(1, 1, device_type_, base::DataType::kDataTypeFp32);
   if (!inout_status) {
     return inout_status;
   }
