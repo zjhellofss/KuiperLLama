@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+
 #include "base/base.h"
 #include "tensor/tensor.h"
 
@@ -23,8 +24,8 @@ enum class LayerType : uint8_t {
 
 class BaseLayer {
  public:
-  explicit BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type,
-                     std::string layer_name = "");
+  explicit BaseLayer(base::DeviceType device_type, LayerType layer_type,
+                     base::DataType data_type, std::string layer_name = "");
 
   base::DataType data_type() const;
 
@@ -37,19 +38,25 @@ class BaseLayer {
   virtual base::Status forward_i1o1(const tensor::Tensor& input1,
                                     const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  virtual base::Status forward_i2o1(const tensor::Tensor& input1,
+                                    const tensor::Tensor& input2,
                                     const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  virtual base::Status forward_i3o1(const tensor::Tensor& input1,
+                                    const tensor::Tensor& input2,
                                     const tensor::Tensor& input3,
                                     const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i4o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                                    const tensor::Tensor& input3, const tensor::Tensor& input4,
+  virtual base::Status forward_i4o1(const tensor::Tensor& input1,
+                                    const tensor::Tensor& input2,
+                                    const tensor::Tensor& input3,
+                                    const tensor::Tensor& input4,
                                     const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i5o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                                    const tensor::Tensor& input3, const tensor::Tensor& input4,
+  virtual base::Status forward_i5o1(const tensor::Tensor& input1,
+                                    const tensor::Tensor& input2,
+                                    const tensor::Tensor& input3,
+                                    const tensor::Tensor& input4,
                                     const tensor::Tensor& input5,
                                     const tensor::Tensor& output1) = 0;
 
@@ -92,32 +99,52 @@ class BaseLayer {
 
 class Layer : public BaseLayer {
  public:
-  explicit Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name = "");
+  explicit Layer(base::DeviceType device_type, LayerType layer_type,
+                 std::string layer_name = "");
 
   base::Status init() override;
 
-  base::Status check_inout(size_t in_num, size_t out_num, base::DeviceType device_type,
+  base::Status check_inout_size(size_t expected_in_num,
+                                size_t expected_out_num) const;
+
+  base::Status check_inout(size_t expected_in_num, size_t expected_out_num,
+                           base::DeviceType device_type,
                            base::DataType data_type) const;
+
+  base::Status check_single_input(size_t in_idx, base::DeviceType device_type,
+                                  base::DataType data_type) const;
+
+  base::Status check_single_output(size_t out_idx, base::DeviceType device_type,
+                                   base::DataType data_type) const;
 
   base::Status check() const override;
 
   base::Status base_forward() override;
 
-  base::Status forward_i1o1(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
-
-  base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
+  base::Status forward_i1o1(const tensor::Tensor& input1,
                             const tensor::Tensor& output1) override;
 
-  base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& input3, const tensor::Tensor& output1) override;
-
-  base::Status forward_i4o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& input3, const tensor::Tensor& input4,
+  base::Status forward_i2o1(const tensor::Tensor& input1,
+                            const tensor::Tensor& input2,
                             const tensor::Tensor& output1) override;
 
-  base::Status forward_i5o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& input3, const tensor::Tensor& input4,
-                            const tensor::Tensor& input5, const tensor::Tensor& output1) override;
+  base::Status forward_i3o1(const tensor::Tensor& input1,
+                            const tensor::Tensor& input2,
+                            const tensor::Tensor& input3,
+                            const tensor::Tensor& output1) override;
+
+  base::Status forward_i4o1(const tensor::Tensor& input1,
+                            const tensor::Tensor& input2,
+                            const tensor::Tensor& input3,
+                            const tensor::Tensor& input4,
+                            const tensor::Tensor& output1) override;
+
+  base::Status forward_i5o1(const tensor::Tensor& input1,
+                            const tensor::Tensor& input2,
+                            const tensor::Tensor& input3,
+                            const tensor::Tensor& input4,
+                            const tensor::Tensor& input5,
+                            const tensor::Tensor& output1) override;
 
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 
@@ -153,6 +180,10 @@ class LayerFp32Param : public Layer {
   base::Status check_weight(size_t wei_num, base::DeviceType device_type,
                             base::DataType data_type) const;
 
+  base::Status check_inout_wei_size(size_t expected_in_num,
+                                    size_t expected_out_num,
+                                    size_t expected_wei_num) const;
+
   size_t weight_size() const;
 
   void reset_weight_size(size_t size);
@@ -163,7 +194,8 @@ class LayerFp32Param : public Layer {
 
   void set_weight(int32_t idx, const tensor::Tensor& weight);
 
-  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
+  void set_weight(int32_t idx, const std::vector<int32_t>& dims,
+                  const float* weight_ptr);
 
  private:
   std::vector<tensor::Tensor> weights_;

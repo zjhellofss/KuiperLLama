@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 #include <sentencepiece_processor.h>
 #include <sys/mman.h>
+#include <array>
 #include <utility>
 #include "base/tick.h"
 namespace model {
@@ -39,20 +40,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
     return error::PathNotValid(token_path_);
   }
 
-  auto spe = std::make_unique<sentencepiece::SentencePieceProcessor>();
-  const auto& status = spe->Load(token_path_);
-  if (!status.ok()) {
-    return error::PathNotValid(token_path_);
-  }
-
-  vocab_size_ = spe->GetPieceSize();
-  if (vocab_size_ <= 0) {
-    return error::ModelParseError("The vocab size param read error from the model file!");
-  }
   device_type_ = device_type;
-  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false,
-                                                    std::move(spe));
-
   Status read_status = gen_model_from_file();
   if (!read_status) {
     return read_status;
@@ -189,44 +177,63 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   return base::error::Success();
 }
 
-base::Status LLama2Model::gen_model_from_file() {
+base::Status LLama2Model::generate_llama_infos(const LLamaModelConfig& config) {
+  dim_ = config.dim;
+  hidden_dim_ = config.hidden_dim;
+  layer_num_ = config.layer_num;
+  head_num_ = config.head_num;
+  kv_head_num_ = config.head_num;
+  seq_len_ = config.seq_len;
+
+  kv_dim_ = (config.dim * config.kv_head_num) / config.head_num;
+  kv_mul_ = config.head_num / config.kv_head_num;
+  head_size_ = config.dim / config.head_num;
+
+  if (config.vocab_size > 0) {
+    is_shared_weight_ = true;
+  } else {
+    is_shared_weight_ = false;
+  }
+
+  if (std::abs(config.vocab_size) != vocab_size_) {
+    return base::error::ModelParseError(
+        "Vocabulary size mismatch between the model file and the token list.");
+  }
+  return base::error::Success();
+}
+
+base::Status LLama2Model::read_model_file() {
   using namespace base;
+  if (model_path_.empty()) {
+    return error::PathNotValid("Failed to open the weight file, the model path is empty!");
+  }
+  int32_t fd = open(model_path_.data(), O_RDONLY);
+  if (fd == -1) {
+    return error::PathNotValid("Failed to open the weight file " + model_path_ +
+                               " may be the path does not exist!");
+  }
+
   FILE* file = fopen(model_path_.data(), "rb");
   if (!file) {
     return error::PathNotValid("Failed to open the file. The path may be invalid.");
   }
-  auto config = std::make_unique<LlamaModelConfig>();
-  if (fread(config.get(), sizeof(LlamaModelConfig), 1, file) != 1) {
+
+  auto config = LLamaModelConfig{};
+  if (fread(&config, sizeof(LLamaModelConfig), 1, file) != 1) {
     return error::ModelParseError(
-        "Failed to retrieve the configuration information from the model file.");
+        "Failed to retrieve the configuration information from the model "
+        "file.");
   }
 
-  dim_ = config->dim;
-  hidden_dim_ = config->hidden_dim;
-  layer_num_ = config->layer_num;
-  head_num_ = config->head_num;
-  kv_head_num_ = config->head_num;
-  seq_len_ = config->seq_len;
-
-  kv_dim_ = (config->dim * config->kv_head_num) / config->head_num;
-  kv_mul_ = config->head_num / config->kv_head_num;
-  head_size_ = config->dim / config->head_num;
-
-  if (std::abs(config->vocab_size) != vocab_size_) {
-    return error::ModelParseError(
-        "Vocabulary size mismatch between the model file and the token list.");
+  auto gen_status = generate_llama_infos(config);
+  if (!gen_status) {
+    return gen_status;
   }
 
   raw_model_data_ = std::make_unique<LLamaRawModelData>();
   fseek(file, 0, SEEK_END);
   raw_model_data_->file_size = ftell(file);
   fclose(file);
-
-  int32_t fd = open(model_path_.data(), O_RDONLY);
-  if (fd == -1) {
-    return error::PathNotValid("Failed to open the weight file " + model_path_ +
-                               " may be the path does not exist!");
-  }
 
   raw_model_data_->fd = fd;
   raw_model_data_->data = static_cast<float*>(
@@ -236,17 +243,37 @@ base::Status LLama2Model::gen_model_from_file() {
     return error::ModelParseError("Failed to map the weight file " + model_path_ + " into memory.");
   }
 
-  raw_model_data_->weight_data = raw_model_data_->data + sizeof(LlamaModelConfig) / sizeof(float);
+  raw_model_data_->weight_data = raw_model_data_->data + sizeof(LLamaModelConfig) / sizeof(float);
   if (raw_model_data_ == nullptr) {
     LOG(ERROR);
     return error::ModelParseError("Failed to map the weight file " + model_path_ +
                                   " into memory, the pointer to weight start address is null");
   }
+  return error::Success();
+}
+
+base::Status LLama2Model::gen_model_from_file() {
+  using namespace base;
+
+  // init s entence piece processor
+  auto create_encode_status = create_encode_layer();
+  if (!create_encode_status) {
+    LOG(ERROR) << "Create the encode layer failed!";
+    return create_encode_status;
+  }
+
+  auto mmap_status = read_model_file();
+  if (!mmap_status) {
+    LOG(ERROR) << "Handle model file " << model_path_ << " failed!";
+    return mmap_status;
+  }
 
   auto layer_create_status = create_layers();
   if (!layer_create_status) {
+    LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed!";
     return layer_create_status;
   }
+
   return error::Success();
 }
 
@@ -359,13 +386,20 @@ void LLama2Model::create_matmul_layers() {
     pos += dim * hidden_dim;
   }
 
+  // skip final rms weight
   pos += dim;
   pos += seq_len_ * head_size_;
+
   cls_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size_, dim);
   cls_layer_->reset_input_size(1);
   cls_layer_->reset_output_size(1);
   cls_layer_->reset_weight_size(1);
-  cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos));
+  if (is_shared_weight_) {
+    // using token embedding weight
+    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(0));
+  } else {
+    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos));
+  }
   cls_layer_->get_weight(0).set_device_type(device_type_);
 }
 
@@ -411,7 +445,8 @@ void LLama2Model::create_rmsnorm_layers() {
   rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
   rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
 
-  std::unique_ptr<op::RmsNormLayer> rms_final_layer = std::make_unique<op::RmsNormLayer>(device_type_,dim_);
+  std::unique_ptr<op::RmsNormLayer> rms_final_layer =
+      std::make_unique<op::RmsNormLayer>(device_type_, dim_);
   rms_final_layer->reset_input_size(1);
   rms_final_layer->reset_output_size(1);
   rms_final_layer->reset_weight_size(1);
@@ -495,7 +530,7 @@ base::Status LLama2Model::insert_buffer(ModelBufferType buffer_idx, const tensor
 }
 
 tensor::Tensor& LLama2Model::get_buffer(ModelBufferType buffer_idx) {
-  CHECK_GT(buffers_.count(buffer_idx), 0);
+  CHECK_GT(buffers_.count(buffer_idx), 0) << int(buffer_idx);
   return buffers_.at(buffer_idx);
 }
 
@@ -544,8 +579,30 @@ void LLama2Model::create_add_layer() {
   add_layer_->reset_output_size(1);
 }
 
+base::Status LLama2Model::create_encode_layer() {
+  using namespace base;
+  std::unique_ptr<sentencepiece::SentencePieceProcessor> spe;
+  const auto& status = spe->Load(token_path_);
+  if (!status.ok()) {
+    return error::PathNotValid(token_path_);
+  }
+
+  vocab_size_ = spe->GetPieceSize();
+  if (vocab_size_ <= 0) {
+    return error::InternalError("The vocab size param read error from the model file!");
+  }
+
+  // create token encode decode layer
+  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false, std::move(spe));
+  if (!encode_layer_) {
+    return error::InternalError("Create the encode layer failed.");
+  }
+  return error::Success();
+}
+
 base::Status LLama2Model::create_layers() {
   using namespace base;
+
   create_embedding_layer();
   if (!embedding_layer_) {
     return error::InternalError("Create the embedding layer for the llama model failed!");
@@ -560,14 +617,16 @@ base::Status LLama2Model::create_layers() {
   if (wq_layers_.size() != layer_num_ || wk_layers_.size() != layer_num_ ||
       wv_layers_.size() != layer_num_ || wo_layers_.size() != layer_num_) {
     return error::InternalError(
-        "Create the matmul layer in the attention and ffn attention layers for the llama model "
+        "Create the matmul layer in the attention and ffn attention layers for "
+        "the llama model "
         "failed.");
   }
 
   if (w1_layers_.size() != layer_num_ || w2_layers_.size() != layer_num_ ||
       w3_layers_.size() != layer_num_) {
     return error::InternalError(
-        "Create the matmul layer in the feedforward layers for the llama model failed.");
+        "Create the matmul layer in the feedforward layers for the llama model "
+        "failed.");
   }
 
   create_rope_layer();

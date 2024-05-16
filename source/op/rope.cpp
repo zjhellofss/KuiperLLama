@@ -17,6 +17,7 @@ base::Status RoPELayer::base_forward() {
   tensor::Tensor input_q = this->get_input(0);
   tensor::Tensor input_k = this->get_input(1);
   tensor::Tensor input_pos = this->get_input(2);
+
   const int32_t pos = *input_pos.ptr<int32_t>(0);
 
   for (int32_t i = 0; i < dim_; i += 2) {
@@ -40,7 +41,27 @@ base::Status RoPELayer::base_forward() {
 }
 
 base::Status RoPELayer::check() const {
-  return check_inout(3, 1, device_type_, base::DataType::kDataTypeFp32);
+  auto status = check_inout_size(3, 1);
+  if (!status) {
+    return status;
+  }
+
+  status = check_single_input(2, device_type_, base::DataType::kDataTypeInt32);
+  if (!status) {
+    return status;
+  }
+
+  status = check_single_input(1, device_type_, base::DataType::kDataTypeFp32);
+  if (!status) {
+    return status;
+  }
+
+  status = check_single_input(0, device_type_, base::DataType::kDataTypeFp32);
+  if (!status) {
+    return status;
+  }
+
+  return base::error::Success();
 }
 
 }  // namespace op

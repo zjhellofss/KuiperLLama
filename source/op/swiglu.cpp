@@ -12,11 +12,11 @@ base::Status SwiGLULayer::check() const {
   }
 
   if (this->get_input(0).size() != hidden_dim_) {
-    return base::error::InternalError("The size of input tensor is not equal to hidden dim.");
+    return base::error::InternalError("The size of input tensor 0 is not equal to hidden dim.");
   }
 
   if (this->get_input(1).size() != hidden_dim_) {
-    return base::error::InternalError("The size of input tensor is not equal to hidden dim.");
+    return base::error::InternalError("The size of input tensor 1 is not equal to hidden dim.");
   }
 
   if (this->get_output(0).size() != hidden_dim_) {
