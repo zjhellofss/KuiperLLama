@@ -1,10 +1,13 @@
 #include "model/llama2.h"
+
 #include <fcntl.h>
 #include <glog/logging.h>
 #include <sentencepiece_processor.h>
 #include <sys/mman.h>
+
 #include <array>
 #include <utility>
+
 #include "base/tick.h"
 namespace model {
 LLamaRawModelData::~LLamaRawModelData() {
@@ -31,8 +34,8 @@ bool LLamaRawModelData::is_weight_valid(size_t peek) const {
 }
 
 LLama2Model::LLama2Model(std::string token_path, std::string model_path)
-    : Model(base::ModelType::kModelTypeLLama2, std::move(token_path), std::move(model_path)) {
-}
+    : Model(base::ModelType::kModelTypeLLama2, std::move(token_path),
+            std::move(model_path)) {}
 
 base::Status LLama2Model::init(base::DeviceType device_type) {
   using namespace base;
@@ -45,12 +48,12 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   if (!read_status) {
     return read_status;
   }
-
   init_mem();
   return error::Success();
 }
 
-base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_steps) {
+base::Status LLama2Model::forward(const std::vector<int>& tokens,
+                                  int32_t total_steps) {
   CHECK(device_type_ == base::DeviceType::kDeviceCPU);
   auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
@@ -58,9 +61,10 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     input_tokens.index<int32_t>(i) = tokens.at(i);
   }
 
-  auto input_token_num =
-      tensor::Tensor(base::DataType::kDataTypeInt32, static_cast<int32_t>(tokens.size()));
-  StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
+  auto input_token_num = tensor::Tensor(base::DataType::kDataTypeInt32,
+                                        static_cast<int32_t>(tokens.size()));
+  StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num,
+                                             input_embeddings));
 
   int32_t pos = 0;
   int32_t next = -1;
@@ -73,18 +77,22 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     tensor::Tensor input(base::DataType::kDataTypeFp32, dim_);
     if (pos < tokens.size()) {
       // prefill steps
-      std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-          dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(pos * dim_), true);
+      std::shared_ptr<base::Buffer> input_emb_buffer =
+          std::make_shared<base::Buffer>(
+              dim_ * sizeof(float), nullptr,
+              input_embeddings.ptr<float>(pos * dim_), true);
       input.assign(input_emb_buffer);
     } else {
       // generate steps
       CHECK_NE(next, -1);
       input_token_num.reshape({1});
       input_tokens.index<int32_t>(0) = next;
-      StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
+      StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num,
+                                                 input_embeddings));
 
-      std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-          dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
+      std::shared_ptr<base::Buffer> input_emb_buffer =
+          std::make_shared<base::Buffer>(dim_ * sizeof(float), nullptr,
+                                         input_embeddings.ptr<float>(0), true);
       input.assign(input_emb_buffer);
     }
 
@@ -92,7 +100,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
       // attn rmsnorm
       auto rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
-      StatusCheck(rmsnorm_layers_.at(layer_idx)->forward_i1o1(input, rmsnorm_output));
+      StatusCheck(
+          rmsnorm_layers_.at(layer_idx)->forward_i1o1(input, rmsnorm_output));
 
       // kv cache
       tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
@@ -109,7 +118,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
       StatusCheck(wv_layers_.at(layer_idx)->forward_i1o1(rmsnorm_output, val));
 
       // rope
-      StatusCheck(rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
+      StatusCheck(
+          rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
 
       // mha
       tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
@@ -121,27 +131,31 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
       mha_layer_->set_pos(pos);
       mha_layer_->set_layer_index(layer_idx);
-      StatusCheck(mha_layer_->forward_i5o1(query, score_storage, key_cache, val_cache, key_storage,
-                                           mha_output));
+      StatusCheck(mha_layer_->forward_i5o1(query, score_storage, key_cache,
+                                           val_cache, key_storage, mha_output));
 
       // wo @ attention output
       tensor::Tensor attn_output = get_buffer(ModelBufferType::kAttnOutput);
-      StatusCheck(wo_layers_.at(layer_idx)->forward_i1o1(mha_output, attn_output));
+      StatusCheck(
+          wo_layers_.at(layer_idx)->forward_i1o1(mha_output, attn_output));
 
       // residual add
       StatusCheck(add_layer_->forward_i2o1(input, attn_output, input));
 
       // ffn rmsnorm
       tensor::Tensor ffn_norm_output = get_buffer(ModelBufferType::kFFNRMSNorm);
-      StatusCheck(rmsnorm_layers_.at(layer_idx + layer_num_)->forward_i1o1(input, ffn_norm_output));
+      StatusCheck(rmsnorm_layers_.at(layer_idx + layer_num_)
+                      ->forward_i1o1(input, ffn_norm_output));
 
       // w1
       tensor::Tensor w1_output = get_buffer(ModelBufferType::kW1Output);
-      StatusCheck(w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_output));
+      StatusCheck(
+          w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_output));
 
       // w3
       tensor::Tensor w3_ouput = get_buffer(ModelBufferType::kW3Output);
-      StatusCheck(w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput));
+      StatusCheck(
+          w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput));
 
       // SwiGLU
       StatusCheck(swiglu_layer_->forward_i2o1(w1_output, w3_ouput, w1_output));
@@ -163,7 +177,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     } else {
       next = (int32_t)std::distance(
           forward_output_ptr,
-          std::max_element(forward_output_ptr, forward_output_ptr + forward_output.size()));
+          std::max_element(forward_output_ptr,
+                           forward_output_ptr + forward_output.size()));
     }
 
     std::string output_str = this->encode_layer_->decode(next);
@@ -205,7 +220,8 @@ base::Status LLama2Model::generate_llama_infos(const LLamaModelConfig& config) {
 base::Status LLama2Model::read_model_file() {
   using namespace base;
   if (model_path_.empty()) {
-    return error::PathNotValid("Failed to open the weight file, the model path is empty!");
+    return error::PathNotValid(
+        "Failed to open the weight file, the model path is empty!");
   }
   int32_t fd = open(model_path_.data(), O_RDONLY);
   if (fd == -1) {
@@ -215,7 +231,8 @@ base::Status LLama2Model::read_model_file() {
 
   FILE* file = fopen(model_path_.data(), "rb");
   if (!file) {
-    return error::PathNotValid("Failed to open the file. The path may be invalid.");
+    return error::PathNotValid(
+        "Failed to open the file. The path may be invalid.");
   }
 
   auto config = LLamaModelConfig{};
@@ -236,18 +253,22 @@ base::Status LLama2Model::read_model_file() {
   fclose(file);
 
   raw_model_data_->fd = fd;
-  raw_model_data_->data = static_cast<float*>(
-      mmap(nullptr, raw_model_data_->file_size, PROT_READ, MAP_PRIVATE, raw_model_data_->fd, 0));
+  raw_model_data_->data =
+      static_cast<float*>(mmap(nullptr, raw_model_data_->file_size, PROT_READ,
+                               MAP_PRIVATE, raw_model_data_->fd, 0));
 
   if (raw_model_data_->data == MAP_FAILED || raw_model_data_->data == nullptr) {
-    return error::ModelParseError("Failed to map the weight file " + model_path_ + " into memory.");
+    return error::ModelParseError("Failed to map the weight file " +
+                                  model_path_ + " into memory.");
   }
 
-  raw_model_data_->weight_data = raw_model_data_->data + sizeof(LLamaModelConfig) / sizeof(float);
+  raw_model_data_->weight_data =
+      raw_model_data_->data + sizeof(LLamaModelConfig) / sizeof(float);
   if (raw_model_data_ == nullptr) {
     LOG(ERROR);
-    return error::ModelParseError("Failed to map the weight file " + model_path_ +
-                                  " into memory, the pointer to weight start address is null");
+    return error::ModelParseError(
+        "Failed to map the weight file " + model_path_ +
+        " into memory, the pointer to weight start address is null");
   }
   return error::Success();
 }
@@ -270,7 +291,8 @@ base::Status LLama2Model::gen_model_from_file() {
 
   auto layer_create_status = create_layers();
   if (!layer_create_status) {
-    LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed!";
+    LOG(ERROR) << "Create layers for the model file " << model_path_
+               << " failed!";
     return layer_create_status;
   }
 
@@ -283,14 +305,15 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
 }
 
 void LLama2Model::create_embedding_layer() {
-  embedding_layer_ =
-      std::make_unique<op::EmbeddingLayer>(device_type_, dim_, seq_len_, std::abs(vocab_size_));
+  embedding_layer_ = std::make_unique<op::EmbeddingLayer>(
+      device_type_, dim_, seq_len_, std::abs(vocab_size_));
 
   const float* weight_embedding = raw_model_data_->weight(0);
   embedding_layer_->reset_weight_size(1);
   embedding_layer_->reset_input_size(2);
   embedding_layer_->reset_output_size(1);
-  embedding_layer_->set_weight(0, {std::abs(vocab_size_), dim_}, weight_embedding);
+  embedding_layer_->set_weight(0, {std::abs(vocab_size_), dim_},
+                               weight_embedding);
   embedding_layer_->get_weight(0).set_device_type(device_type_);
 }
 
@@ -390,15 +413,18 @@ void LLama2Model::create_matmul_layers() {
   pos += dim;
   pos += seq_len_ * head_size_;
 
-  cls_layer_ = std::make_unique<op::MatmulLayer>(device_type_, vocab_size_, dim);
+  cls_layer_ =
+      std::make_unique<op::MatmulLayer>(device_type_, vocab_size_, dim);
   cls_layer_->reset_input_size(1);
   cls_layer_->reset_output_size(1);
   cls_layer_->reset_weight_size(1);
   if (is_shared_weight_) {
     // using token embedding weight
-    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(0));
+    cls_layer_->set_weight(0, {vocab_size_, dim},
+                           this->raw_model_data_->weight(0));
   } else {
-    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos));
+    cls_layer_->set_weight(0, {vocab_size_, dim},
+                           this->raw_model_data_->weight(pos));
   }
   cls_layer_->get_weight(0).set_device_type(device_type_);
 }
@@ -460,8 +486,10 @@ void LLama2Model::create_rmsnorm_layers() {
 void LLama2Model::init_mem() {
   auto alloc = base::CPUDeviceAllocatorFactory::get_instance();
   int32_t max_seq_len = seq_len_;
-  tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, static_cast<int32_t>(max_seq_len));
-  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len, dim_);
+  tensor::Tensor input_tokens(base::DataType::kDataTypeInt32,
+                              static_cast<int32_t>(max_seq_len));
+  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len,
+                                  dim_);
 
   input_tokens.allocate(alloc);
   input_embeddings.allocate(alloc);
@@ -475,7 +503,8 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kW2Output, rms_output));
   CHECK(insert_buffer(ModelBufferType::kFFNRMSNorm, rms_output));
 
-  tensor::Tensor score_storage(base::DataType::kDataTypeFp32, head_size_, seq_len_);
+  tensor::Tensor score_storage(base::DataType::kDataTypeFp32, head_size_,
+                               seq_len_);
   score_storage.allocate(alloc);
   CHECK(insert_buffer(ModelBufferType::kKeyStorage, score_storage));
 
@@ -488,8 +517,10 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kW3Output, w3_output));
 
   // kv cache
-  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_);
-  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_);
+  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_,
+                           kv_dim_);
+  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, layer_num_,
+                             seq_len_, kv_dim_);
 
   key_cache.allocate(alloc);
   value_cache.allocate(alloc);
@@ -518,12 +549,15 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
 }
 
-base::Status LLama2Model::insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor) {
+base::Status LLama2Model::insert_buffer(ModelBufferType buffer_idx,
+                                        const tensor::Tensor& tensor) {
   if (buffers_.count(buffer_idx) > 0) {
-    return base::error::KeyHasExits(std::to_string(int(buffer_idx)) + " has exits in the buffers");
+    return base::error::KeyHasExits(std::to_string(int(buffer_idx)) +
+                                    " has exits in the buffers");
   }
   if (tensor.is_empty()) {
-    return base::error::InvalidArgument("The tensor is empty for inserting buffer.");
+    return base::error::InvalidArgument(
+        "The tensor is empty for inserting buffer.");
   }
   buffers_.insert({buffer_idx, tensor});
   return base::error::Success();
@@ -534,23 +568,27 @@ tensor::Tensor& LLama2Model::get_buffer(ModelBufferType buffer_idx) {
   return buffers_.at(buffer_idx);
 }
 
-const tensor::Tensor& LLama2Model::get_buffer(ModelBufferType buffer_idx) const {
+const tensor::Tensor& LLama2Model::get_buffer(
+    ModelBufferType buffer_idx) const {
   CHECK_GT(buffers_.count(buffer_idx), 0);
   return buffers_.at(buffer_idx);
 }
 
-std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
-                                                                      int32_t token_pos) {
+std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(
+    int32_t layer_idx, int32_t token_pos) {
   int32_t layer_offset = layer_idx * seq_len_ * kv_dim_;
-  int32_t cache_offset = static_cast<int32_t>(layer_offset + token_pos * kv_dim_);
+  int32_t cache_offset =
+      static_cast<int32_t>(layer_offset + token_pos * kv_dim_);
 
-  float* key_cache_ptr = get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset);
-  float* val_cache_ptr = get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset);
+  float* key_cache_ptr =
+      get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset);
+  float* val_cache_ptr =
+      get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset);
 
-  auto key_cache =
-      std::make_shared<base::Buffer>(kv_dim_ * sizeof(float), nullptr, key_cache_ptr, true);
-  auto val_cache =
-      std::make_shared<base::Buffer>(kv_dim_ * sizeof(float), nullptr, val_cache_ptr, true);
+  auto key_cache = std::make_shared<base::Buffer>(kv_dim_ * sizeof(float),
+                                                  nullptr, key_cache_ptr, true);
+  auto val_cache = std::make_shared<base::Buffer>(kv_dim_ * sizeof(float),
+                                                  nullptr, val_cache_ptr, true);
   key_cache->set_device_type(device_type_);
   val_cache->set_device_type(device_type_);
   tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim_);
@@ -561,14 +599,15 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
 }
 
 void LLama2Model::create_rope_layer() {
-  rope_layer_ = std::make_unique<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
+  rope_layer_ =
+      std::make_unique<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
   rope_layer_->reset_input_size(3);
   rope_layer_->reset_output_size(1);
 }
 
 void LLama2Model::create_mha_layers() {
-  mha_layer_ = std::make_unique<op::MultiHeadAttention>(device_type_, kv_mul_, kv_dim_, seq_len_,
-                                                        head_num_, head_size_);
+  mha_layer_ = std::make_unique<op::MultiHeadAttention>(
+      device_type_, kv_mul_, kv_dim_, seq_len_, head_num_, head_size_);
   mha_layer_->reset_input_size(5);
   mha_layer_->reset_output_size(1);
 }
@@ -581,7 +620,8 @@ void LLama2Model::create_add_layer() {
 
 base::Status LLama2Model::create_encode_layer() {
   using namespace base;
-  std::unique_ptr<sentencepiece::SentencePieceProcessor> spe;
+  std::unique_ptr<sentencepiece::SentencePieceProcessor> spe =
+      std::make_unique<sentencepiece::SentencePieceProcessor>();
   const auto& status = spe->Load(token_path_);
   if (!status.ok()) {
     return error::PathNotValid(token_path_);
@@ -589,11 +629,13 @@ base::Status LLama2Model::create_encode_layer() {
 
   vocab_size_ = spe->GetPieceSize();
   if (vocab_size_ <= 0) {
-    return error::InternalError("The vocab size param read error from the model file!");
+    return error::InternalError(
+        "The vocab size param read error from the model file!");
   }
 
   // create token encode decode layer
-  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false, std::move(spe));
+  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false,
+                                                    std::move(spe));
   if (!encode_layer_) {
     return error::InternalError("Create the encode layer failed.");
   }
@@ -605,12 +647,14 @@ base::Status LLama2Model::create_layers() {
 
   create_embedding_layer();
   if (!embedding_layer_) {
-    return error::InternalError("Create the embedding layer for the llama model failed!");
+    return error::InternalError(
+        "Create the embedding layer for the llama model failed!");
   }
 
   create_rmsnorm_layers();
   if (rmsnorm_layers_.size() != 2 * layer_num_ + 1) {
-    return error::InternalError("Create the rmsnorm layers for the llama model failed!");
+    return error::InternalError(
+        "Create the rmsnorm layers for the llama model failed!");
   }
 
   create_matmul_layers();
@@ -631,22 +675,26 @@ base::Status LLama2Model::create_layers() {
 
   create_rope_layer();
   if (!rope_layer_) {
-    return error::InternalError("Create the rope layer for the llama model failed!");
+    return error::InternalError(
+        "Create the rope layer for the llama model failed!");
   }
 
   create_add_layer();
   if (!add_layer_) {
-    return error::InternalError("Create the add layer for the llama model failed!");
+    return error::InternalError(
+        "Create the add layer for the llama model failed!");
   }
 
   create_mha_layers();
   if (!mha_layer_) {
-    return error::InternalError("Create the mha layer for the llama model failed!");
+    return error::InternalError(
+        "Create the mha layer for the llama model failed!");
   }
 
   create_swiglu_layer();
   if (!swiglu_layer_) {
-    return error::InternalError("Create the SwiGLU layer for the llama model failed!");
+    return error::InternalError(
+        "Create the SwiGLU layer for the llama model failed!");
   }
   return error::Success();
 }
