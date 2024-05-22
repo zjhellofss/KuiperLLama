@@ -4,8 +4,12 @@
 #include <utility>
 
 namespace op {
-BaseLayer::BaseLayer(LayerType layer_type, base::DataType data_type, std::string layer_name)
-    : layer_type_(layer_type), data_type_(data_type), layer_name_(std::move(layer_name)) {
+BaseLayer::BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type,
+                     std::string layer_name)
+    : device_type_(device_type),
+      layer_type_(layer_type),
+      data_type_(data_type),
+      layer_name_(std::move(layer_name)) {
 }
 
 base::DataType BaseLayer::data_type() const {
@@ -23,9 +27,16 @@ const std::string& BaseLayer::get_layer_name() const {
 void BaseLayer::set_layer_name(const std::string& layer_name) {
   layer_name_ = layer_name;
 }
+base::DeviceType BaseLayer::device_type() const {
+  return device_type_;
+}
 
-Layer::Layer(LayerType layer_type, std::string layer_name)
-    : BaseLayer(layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
+void BaseLayer::set_device_type(base::DeviceType device_type) {
+  device_type_ = device_type;
+}
+
+Layer::Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name)
+    : BaseLayer(device_type, layer_type, base::DataType::kDataTypeFp32, std::move(layer_name)) {
 }
 
 base::Status Layer::init() {
@@ -34,6 +45,49 @@ base::Status Layer::init() {
 
 base::Status Layer::base_forward() {
   return base::error::FunctionNotImplement("");
+}
+
+base::Status Layer::check_inout_size(size_t expected_in_num, size_t expected_out_num) const {
+  if (expected_in_num != this->input_size()) {
+    return base::error::InternalError("The input tensors in the layer is wrong");
+  }
+  if (expected_out_num != this->output_size()) {
+    return base::error::InternalError("The output tensors in the layer is wrong");
+  }
+  return base::error::Success();
+}
+
+base::Status Layer::check_single_output(size_t out_idx, base::DeviceType device_type,
+                                        base::DataType data_type) const {
+  if (this->get_output(out_idx).is_empty()) {
+    return base::error::InternalError("The output tensor " + std::to_string(out_idx) +
+                                      " is empty.");
+  }
+  if (this->get_output(out_idx).data_type() != data_type) {
+    return base::error::InternalError("The output tensor " + std::to_string(out_idx) +
+                                      " has a wrong data type.");
+  }
+  if (this->get_output(out_idx).device_type() != device_type) {
+    return base::error::InternalError("The output tensor " + std::to_string(out_idx) +
+                                      " has a wrong device type.");
+  }
+  return base::error::Success();
+}
+
+base::Status Layer::check_single_input(size_t in_idx, base::DeviceType device_type,
+                                       base::DataType data_type) const {
+  if (this->get_input(in_idx).is_empty()) {
+    return base::error::InternalError("The input tensor " + std::to_string(in_idx) + " is empty.");
+  }
+  if (this->get_input(in_idx).data_type() != data_type) {
+    return base::error::InternalError("The input tensor " + std::to_string(in_idx) +
+                                      " has a wrong data type.");
+  }
+  if (this->get_input(in_idx).device_type() != device_type) {
+    return base::error::InternalError("The input tensor " + std::to_string(in_idx) +
+                                      " has a wrong device type.");
+  }
+  return base::error::Success();
 }
 
 base::Status Layer::check_inout(size_t in_num, size_t out_num, base::DeviceType device_type,
@@ -134,8 +188,9 @@ size_t Layer::output_size() const {
   return outputs_.size();
 }
 
-LayerFp32Param::LayerFp32Param(LayerType layer_type, std::string layer_name)
-    : Layer(layer_type, std::move(layer_name)) {
+LayerFp32Param::LayerFp32Param(base::DeviceType device_type, LayerType layer_type,
+                               std::string layer_name)
+    : Layer(device_type, layer_type, std::move(layer_name)) {
 }
 
 void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
@@ -143,6 +198,20 @@ void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
   CHECK_LT(idx, weights_.size());
   CHECK(weight.data_type() == base::DataType::kDataTypeFp32);
   weights_.at(idx) = weight;
+}
+
+base::Status LayerFp32Param::check_inout_wei_size(size_t expected_in_num, size_t expected_out_num,
+                                                  size_t expected_wei_num) const {
+  if (expected_in_num != this->input_size()) {
+    return base::error::InternalError("The size of input tensors in the layer is wrong");
+  }
+  if (expected_out_num != this->output_size()) {
+    return base::error::InternalError("The size of output tensors in the layer is wrong");
+  }
+  if (expected_wei_num != this->weight_size()) {
+    return base::error::InternalError("The size of weight tensors in the layer is wrong");
+  }
+  return base::error::Success();
 }
 
 const tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) const {

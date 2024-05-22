@@ -1,6 +1,13 @@
 #include "op/rope.h"
 #include <cmath>
 namespace op {
+RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_size)
+    : Layer(device_type, LayerType::kLayerRoPe, "RoPe"),
+      dim_(dim),
+      kv_dim_(kv_dim),
+      head_size_(head_size) {
+}
+
 base::Status RoPELayer::base_forward() {
   base::Status status = check();
   if (!status) {
@@ -10,6 +17,7 @@ base::Status RoPELayer::base_forward() {
   tensor::Tensor input_q = this->get_input(0);
   tensor::Tensor input_k = this->get_input(1);
   tensor::Tensor input_pos = this->get_input(2);
+
   const int32_t pos = *input_pos.ptr<int32_t>(0);
 
   for (int32_t i = 0; i < dim_; i += 2) {
@@ -33,17 +41,27 @@ base::Status RoPELayer::base_forward() {
 }
 
 base::Status RoPELayer::check() const {
-  if (this->input_size() != 3) {
-    return base::error::InternalError("The input number is not equal to " + std::to_string(3));
+  auto status = check_inout_size(3, 1);
+  if (!status) {
+    return status;
   }
-  if (this->output_size() != 1) {
-    return base::error::InternalError("The output number is not equal to " + std::to_string(1));
-  }
-  return base::error::Success();
-}
 
-RoPELayer::RoPELayer(int32_t dim, int32_t kv_dim, int32_t head_size)
-    : Layer(LayerType::kLayerRoPe, "RoPe"), dim_(dim), kv_dim_(kv_dim), head_size_(head_size) {
+  status = check_single_input(2, device_type_, base::DataType::kDataTypeInt32);
+  if (!status) {
+    return status;
+  }
+
+  status = check_single_input(1, device_type_, base::DataType::kDataTypeFp32);
+  if (!status) {
+    return status;
+  }
+
+  status = check_single_input(0, device_type_, base::DataType::kDataTypeFp32);
+  if (!status) {
+    return status;
+  }
+
+  return base::error::Success();
 }
 
 }  // namespace op

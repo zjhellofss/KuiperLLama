@@ -56,6 +56,8 @@ class Model {
 
   virtual base::Status create_layers() = 0;
 
+  virtual base::Status read_model_file() = 0;
+
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
 
   virtual tensor::Tensor& get_buffer(ModelBufferType buffer_idx) = 0;
@@ -68,6 +70,7 @@ class Model {
                                                                    int32_t token_pos) = 0;
 
  protected:
+  bool is_shared_weight_ = false;
   std::string token_path_;
   std::string model_path_;
   base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;

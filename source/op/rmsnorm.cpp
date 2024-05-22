@@ -1,8 +1,8 @@
 #include "op/rmsnorm.h"
 #include <armadillo>
 namespace op {
-RmsNormLayer::RmsNormLayer(int32_t dim)
-    : LayerFp32Param(LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
+RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
+    : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
 }
 
 base::Status RmsNormLayer::base_forward() {
@@ -27,12 +27,11 @@ base::Status RmsNormLayer::base_forward() {
 }
 
 base::Status RmsNormLayer::check() const {
-  auto inout_status =
-      check_inout(1, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  auto inout_status = check_inout(1, 1, device_type_, base::DataType::kDataTypeFp32);
   if (!inout_status) {
     return inout_status;
   }
-  auto wei_status = check_weight(1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  auto wei_status = check_weight(1, device_type_, base::DataType::kDataTypeFp32);
   if (!wei_status) {
     return wei_status;
   }

@@ -39,7 +39,13 @@ class LLama2Model : public Model {
 
   base::Status gen_model_from_file() override;
 
+  base::Status read_model_file() override;
+
   base::Status create_layers() override;
+
+  base::Status generate_llama_infos(const LLamaModelConfig& config);
+
+  base::Status create_encode_layer();
 
   void create_rope_layer();
 

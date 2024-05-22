@@ -1,14 +1,14 @@
 #include "op/mha.h"
 namespace op {
-MultiHeadAttention::MultiHeadAttention(int32_t kv_mul, int32_t kv_dim, int32_t seq_len,
-                                       int32_t head_num, int32_t head_size)
-    : Layer(LayerType::kLayerMHA, "MultiHead"),
+MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t kv_mul, int32_t kv_dim,
+                                       int32_t seq_len, int32_t head_num, int32_t head_size)
+    : Layer(device_type, LayerType::kLayerMHA, "MultiHead"),
       kv_mul_(kv_mul),
       kv_dim_(kv_dim),
       seq_len_(seq_len),
       head_num_(head_num),
       head_size_(head_size) {
-  softmax_ = std::make_unique<op::SoftmaxLayer>();
+  softmax_ = std::make_unique<op::SoftmaxLayer>(device_type);
   softmax_->reset_input_size(1);
   softmax_->reset_output_size(1);
 }
@@ -43,7 +43,7 @@ base::Status MultiHeadAttention::base_forward() {
     score = (query * key_mat) / std::sqrt(static_cast<float>(head_size_));
     auto score_head_buffer =
         std::make_shared<base::Buffer>((pos_ + 1) * sizeof(float), nullptr, score_head_addr, true);
-    score_head_buffer->set_device_type(base::DeviceType::kDeviceCPU);
+    score_head_buffer->set_device_type(device_type_);
     tensor::Tensor score_head_tensor(base::DataType::kDataTypeFp32, pos_ + 1);
     score_head_tensor.assign(score_head_buffer);
     softmax_->forward_i1o1(score_head_tensor, score_head_tensor);
@@ -73,7 +73,7 @@ void MultiHeadAttention::set_layer_index(int32_t layer_index) {
 }
 
 base::Status MultiHeadAttention::check() const {
-  return check_inout(5, 1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  return check_inout(5, 1, device_type_, base::DataType::kDataTypeFp32);
 }
 
 }  // namespace op

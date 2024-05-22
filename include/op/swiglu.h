@@ -4,7 +4,7 @@
 namespace op {
 class SwiGLULayer : public op::Layer {
  public:
-  explicit SwiGLULayer(int32_t hidden_dim);
+  explicit SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim);
 
   base::Status check() const override;
 
