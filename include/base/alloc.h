@@ -26,7 +26,7 @@ class CPUDeviceAllocator : public DeviceAllocator {
  public:
   explicit CPUDeviceAllocator();
 
-  void* allocate(size_t size) const override;
+  void* allocate(size_t byte_size) const override;
 
   void release(void* ptr) const override;
 

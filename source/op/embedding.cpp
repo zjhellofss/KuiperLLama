@@ -15,9 +15,6 @@ base::Status EmbeddingLayer::check() const {
   if (this->output_size() != 1) {
     return base::error::InvalidArgument("The number of output tensors is wrong.");
   }
-  if (this->weight_size() != 1) {
-    return base::error::InvalidArgument("The number of output tensors is wrong.");
-  }
 
   const auto& input_tensor = this->get_input(0);
   if (input_tensor.is_empty()) {
@@ -37,16 +34,11 @@ base::Status EmbeddingLayer::check() const {
     return base::error::InvalidArgument("The dim0 of input tensor is not equal to the seq len.");
   }
 
+  auto weight_status = check_weight(1, base::DeviceType::kDeviceCPU, base::DataType::kDataTypeFp32);
+  if (!weight_status) {
+    return weight_status;
+  }
   const auto& weight_tensor = this->get_weight(0);
-  if (weight_tensor.is_empty()) {
-    return base::error::InvalidArgument("The output tensor is empty.");
-  }
-  if (weight_tensor.device_type() != base::DeviceType::kDeviceCPU) {
-    return base::error::InvalidArgument("The weight tensor has a wrong device type.");
-  }
-  if (weight_tensor.ptr<float>() == nullptr) {
-    return base::error::InvalidArgument("The weight tensor is nullptr.");
-  }
   if (weight_tensor.get_dim(0) != vocab_size_) {
     return base::error::InvalidArgument(
         "The dim0 of weight tensor is not equal to the vocab size.");
@@ -62,8 +54,8 @@ base::Status EmbeddingLayer::check() const {
   if (output_tensor.device_type() != base::DeviceType::kDeviceCPU) {
     return base::error::InvalidArgument("The output tensor has a wrong device type.");
   }
-  if (output_tensor.ptr<float>() == nullptr) {
-    return base::error::InvalidArgument("The output tensor is nullptr.");
+  if (output_tensor.is_empty()) {
+    return base::error::InvalidArgument("The output tensor is empty.");
   }
   if (output_tensor.get_dim(0) != seq_len_) {
     return base::error::InvalidArgument("The dim0 of output tensor is not equal to the seq len.");

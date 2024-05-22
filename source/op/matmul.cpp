@@ -28,7 +28,6 @@ base::Status MatmulLayer::base_forward() {
   auto output = this->get_output(0);
 
   float* input_ptr = input.ptr<float>();
-  float* weight_ptr = weight.ptr<float>();
   float* output_ptr = output.ptr<float>();
 
   const int32_t in_dim0 = input.get_dim(0);
@@ -39,11 +38,22 @@ base::Status MatmulLayer::base_forward() {
   }
 
   arma::fmat input_vec(input_ptr, 1, in_dim0, false, true);
-  arma::fmat weight_mat(weight_ptr, wei_dim1, wei_dim0, false, true);
   arma::fmat output_mat(output_ptr, 1, wei_dim0, false, true);
 
-  output_mat = input_vec * weight_mat;
   // W(dim0, dim1) @ x(dim1) = (dim0) ---> x^t(1,dim1) @ w^t (dim1, dim0)
+  if (weight_.is_empty()) {
+    return base::error::InternalError("The weight is empty in the matmul layer.");
+  }
+  output_mat = input_vec * weight_;
   return base::error::Success();
 }
+
+void MatmulLayer::set_weight(int32_t idx, const std::vector<int32_t>& dims,
+                             const float* weight_ptr) {
+  LayerFp32Param::set_weight(idx, dims, weight_ptr);
+  const int32_t wei_dim0 = get_weight(0).get_dim(0);
+  const int32_t wei_dim1 = get_weight(0).get_dim(1);
+  weight_ = arma::fmat((float*)weight_ptr, wei_dim1, wei_dim0, false, true);
+}
+
 }  // namespace op

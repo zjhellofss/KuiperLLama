@@ -14,7 +14,10 @@ class MatmulLayer : public LayerFp32Param {
 
   explicit MatmulLayer(int32_t dim0, int32_t dim1);
 
+  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr) override;
+
  private:
+  arma::fmat weight_;
   int32_t dim0_ = 0;
   int32_t dim1_ = 0;
 };

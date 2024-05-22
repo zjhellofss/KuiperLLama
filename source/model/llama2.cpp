@@ -85,19 +85,14 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     tensor::Tensor input(base::DataType::kDataTypeFp32, dim_);
     if (pos < tokens.size()) {
       // prefill steps
-      std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-          dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(pos * dim_), true);
-      input.assign(input_emb_buffer);
+      input.assign(dim_ * sizeof(float), input_embeddings.ptr<float>(pos * dim_));
     } else {
       // generate steps
       CHECK_NE(next, -1);
       input_token_num.reshape({1});
       input_tokens.index<int32_t>(0) = next;
       StatusCheck(embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
-
-      std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-          dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
-      input.assign(input_emb_buffer);
+      input.assign(dim_ * sizeof(float), input_embeddings.ptr<float>(0));
     }
 
     input.set_device_type(device_type_);
@@ -517,8 +512,10 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
   val_cache->set_device_type(device_type_);
   tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim_);
   tensor::Tensor val(base::DataType::kDataTypeFp32, kv_dim_);
-  key.assign(key_cache);
-  val.assign(val_cache);
+  key.assign(kv_dim_ * sizeof(float), key_cache_ptr);
+  val.assign(kv_dim_ * sizeof(float), val_cache_ptr);
+  key.set_device_type(device_type_);
+  val.set_device_type(device_type_);
   return {key, val};
 }
 

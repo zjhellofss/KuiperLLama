@@ -152,9 +152,9 @@ class LayerFp32Param : public Layer {
 
   const tensor::Tensor& get_weight(int32_t idx) const;
 
-  void set_weight(int32_t idx, const tensor::Tensor& weight);
+  virtual void set_weight(int32_t idx, const tensor::Tensor& weight);
 
-  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
+  virtual void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
 
  private:
   std::vector<tensor::Tensor> weights_;
