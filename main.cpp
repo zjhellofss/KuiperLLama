@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
   const char* checkpoint_path = argv[1];  // e.g. out/model.bin
   const char* tokenizer_path = argv[2];
   model::LLama2Model model(tokenizer_path, checkpoint_path);
-  StatusCheck(model.init(base::DeviceType::kDeviceCPU));
+  model.init(base::DeviceType::kDeviceCPU);
   std::string sentence = "Hi everyone";
   const auto& tokens = model.encode(sentence);
   const auto s = model.forward(tokens, 256);

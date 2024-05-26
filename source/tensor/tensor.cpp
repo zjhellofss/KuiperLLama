@@ -80,16 +80,6 @@ base::DeviceType Tensor::device_type() const {
   return buffer_->device_type();
 }
 
-bool Tensor::assign(size_t byte_size, void* buffer_ptr, bool need_manage) {
-  const size_t byte_size_ = this->byte_size();
-  if (byte_size != byte_size_) {
-    LOG(ERROR) << "The size of buffer is not equal to the tensor!";
-    return false;
-  }
-  buffer_ = std::make_shared<base::Buffer>(byte_size, nullptr, buffer_ptr, !need_manage);
-  return true;
-}
-
 bool Tensor::assign(std::shared_ptr<base::Buffer> buffer) {
   if (!buffer) {
     LOG(ERROR) << "The buffer parameter in the assign function is null pointer!";
@@ -165,9 +155,9 @@ void Tensor::reshape(const std::vector<int32_t>& dims) {
     return;
   }
 
-  if (size > size_) {
-    const size_t byte_size = size * base::DataTypeSize(this->data_type_);
-    auto new_buffer = std::make_shared<base::Buffer>(byte_size, buffer_->allocator());
+  if (size != size_) {
+    auto new_buffer = std::make_shared<base::Buffer>(size * base::DataTypeSize(this->data_type_),
+                                                     buffer_->allocator());
     CHECK(new_buffer->allocate());
     new_buffer->copy_from(buffer_.get());
     this->buffer_ = new_buffer;

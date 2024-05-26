@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "base/base.h"
 #include "tensor/tensor.h"
 
 namespace op {
@@ -22,7 +23,8 @@ enum class LayerType : uint8_t {
 
 class BaseLayer {
  public:
-  explicit BaseLayer(LayerType layer_type, base::DataType data_type, std::string layer_name = "");
+  explicit BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type,
+                     std::string layer_name = "");
 
   base::DataType data_type() const;
 
@@ -77,20 +79,33 @@ class BaseLayer {
 
   void set_layer_name(const std::string& layer_name);
 
- private:
+  base::DeviceType device_type() const;
+
+  void set_device_type(base::DeviceType device_type);
+
+ protected:
   std::string layer_name_;
-  base::DataType data_type_ = base::DataType::kDataTypeUnknown;
   LayerType layer_type_ = LayerType::kLayerUnknown;
+  base::DataType data_type_ = base::DataType::kDataTypeUnknown;
+  base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;
 };
 
 class Layer : public BaseLayer {
  public:
-  explicit Layer(LayerType layer_type, std::string layer_name = "");
+  explicit Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name = "");
 
   base::Status init() override;
 
-  base::Status check_inout(size_t in_num, size_t out_num, base::DeviceType device_type,
-                           base::DataType data_type) const;
+  base::Status check_inout_size(size_t expected_in_num, size_t expected_out_num) const;
+
+  base::Status check_inout(size_t expected_in_num, size_t expected_out_num,
+                           base::DeviceType device_type, base::DataType data_type) const;
+
+  base::Status check_single_input(int32_t in_idx, base::DeviceType device_type,
+                                  base::DataType data_type) const;
+
+  base::Status check_single_output(int32_t out_idx, base::DeviceType device_type,
+                                   base::DataType data_type) const;
 
   base::Status check() const override;
 
@@ -139,10 +154,14 @@ class Layer : public BaseLayer {
 
 class LayerFp32Param : public Layer {
  public:
-  explicit LayerFp32Param(LayerType layer_type, std::string layer_name = "");
+  explicit LayerFp32Param(base::DeviceType device_type, LayerType layer_type,
+                          std::string layer_name = "");
 
   base::Status check_weight(size_t wei_num, base::DeviceType device_type,
                             base::DataType data_type) const;
+
+  base::Status check_inout_wei_size(size_t expected_in_num, size_t expected_out_num,
+                                    size_t expected_wei_num) const;
 
   size_t weight_size() const;
 
@@ -152,9 +171,9 @@ class LayerFp32Param : public Layer {
 
   const tensor::Tensor& get_weight(int32_t idx) const;
 
-  virtual void set_weight(int32_t idx, const tensor::Tensor& weight);
+  void set_weight(int32_t idx, const tensor::Tensor& weight);
 
-  virtual void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
+  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
 
  private:
   std::vector<tensor::Tensor> weights_;

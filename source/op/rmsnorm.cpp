@@ -37,15 +37,11 @@ base::Status RmsNormLayer::check() const {
   }
 
   if (this->get_input(0).size() != dim_) {
-    return base::error::InternalError("The size of input tensor is not equal to dim.");
+    return base::error::InternalError("The size of input tensor is not equal to dim");
   }
 
   if (this->get_output(0).size() != dim_) {
-    return base::error::InternalError("The size of output tensor is not equal to dim.");
-  }
-
-  if (this->get_weight(0).size() != dim_) {
-    return base::error::InternalError("The size of weight tensor is not equal to dim.");
+    return base::error::InternalError("The size of output tensor is not equal to dim");
   }
   return base::error::Success();
 }

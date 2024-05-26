@@ -57,7 +57,7 @@ base::Status Layer::check_inout_size(size_t expected_in_num, size_t expected_out
   return base::error::Success();
 }
 
-base::Status Layer::check_single_output(size_t out_idx, base::DeviceType device_type,
+base::Status Layer::check_single_output(int32_t out_idx, base::DeviceType device_type,
                                         base::DataType data_type) const {
   if (this->get_output(out_idx).is_empty()) {
     return base::error::InternalError("The output tensor " + std::to_string(out_idx) +
@@ -74,7 +74,7 @@ base::Status Layer::check_single_output(size_t out_idx, base::DeviceType device_
   return base::error::Success();
 }
 
-base::Status Layer::check_single_input(size_t in_idx, base::DeviceType device_type,
+base::Status Layer::check_single_input(int32_t in_idx, base::DeviceType device_type,
                                        base::DataType data_type) const {
   if (this->get_input(in_idx).is_empty()) {
     return base::error::InternalError("The input tensor " + std::to_string(in_idx) + " is empty.");

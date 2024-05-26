@@ -52,8 +52,6 @@ class Tensor {
 
   bool assign(std::shared_ptr<base::Buffer> buffer);
 
-  bool assign(size_t byte_size, void* buffer_ptr, bool need_manage = false);
-
   void reset(base::DataType data_type, const std::vector<int32_t>& dims);
 
   void set_device_type(base::DeviceType device_type);
