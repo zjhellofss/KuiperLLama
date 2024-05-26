@@ -1,10 +1,12 @@
 #include "tensor/tensor.h"
+
 #include <glog/logging.h>
+
 #include <numeric>
 
 namespace tensor {
 template <typename T, typename Tp>
-static inline size_t MultiplyAcc(T begin, T end, Tp init) {
+static inline size_t ReduceDimension(T begin, T end, Tp init) {
   if (begin >= end) {
     return 0;
   }
@@ -22,8 +24,8 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, bool need_alloc,
   }
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_alloc,
-               std::shared_ptr<base::DeviceAllocator> alloc)
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
+               bool need_alloc, std::shared_ptr<base::DeviceAllocator> alloc)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
@@ -33,7 +35,8 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_a
   }
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, bool need_alloc,
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
+               int32_t dim2, bool need_alloc,
                std::shared_ptr<base::DeviceAllocator> alloc)
     : data_type_(data_type) {
   dims_.push_back(dim0);
@@ -45,8 +48,9 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
   }
 }
 
-Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3,
-               bool need_alloc, std::shared_ptr<base::DeviceAllocator> alloc)
+Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
+               int32_t dim2, int32_t dim3, bool need_alloc,
+               std::shared_ptr<base::DeviceAllocator> alloc)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
@@ -60,12 +64,10 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
 
 Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
     : dims_(std::move(dims)), data_type_(data_type) {
-  size_ = MultiplyAcc(dims_.begin(), dims_.end(), 1);
+  size_ = ReduceDimension(dims_.begin(), dims_.end(), 1);
 }
 
-size_t Tensor::size() const {
-  return this->size_;
-}
+size_t Tensor::size() const { return this->size_; }
 
 int32_t Tensor::get_dim(int32_t idx) const {
   CHECK_GE(idx, 0);
@@ -82,7 +84,8 @@ base::DeviceType Tensor::device_type() const {
 
 bool Tensor::assign(std::shared_ptr<base::Buffer> buffer) {
   if (!buffer) {
-    LOG(ERROR) << "The buffer parameter in the assign function is null pointer!";
+    LOG(ERROR)
+        << "The buffer parameter in the assign function is null pointer!";
     return false;
   }
 
@@ -95,7 +98,8 @@ bool Tensor::assign(std::shared_ptr<base::Buffer> buffer) {
   return true;
 }
 
-bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool need_realloc) {
+bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator,
+                      bool need_realloc) {
   if (!allocator) {
     LOG(ERROR) << "The allocator parameter in the allocate function is null "
                   "pointer!";
@@ -104,7 +108,8 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool nee
 
   size_t byte_size = this->byte_size();
   if (!byte_size) {
-    LOG(ERROR) << "The byte_size parameter in the allocate function is equal to zero!";
+    LOG(ERROR)
+        << "The byte_size parameter in the allocate function is equal to zero!";
     return false;
   }
 
@@ -122,9 +127,7 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool nee
   return true;
 }
 
-const std::vector<int32_t>& Tensor::dims() const {
-  return this->dims_;
-}
+const std::vector<int32_t>& Tensor::dims() const { return this->dims_; }
 
 void Tensor::set_device_type(base::DeviceType device_type) {
   if (buffer_) {
@@ -135,20 +138,16 @@ void Tensor::set_device_type(base::DeviceType device_type) {
 void Tensor::reset(base::DataType data_type, const std::vector<int32_t>& dims) {
   this->data_type_ = data_type;
   this->dims_ = dims;
-  this->size_ = MultiplyAcc(dims.begin(), dims.end(), 1);
+  this->size_ = ReduceDimension(dims.begin(), dims.end(), 1);
   this->buffer_ = nullptr;
 }
 
-int32_t Tensor::dims_size() const {
-  return static_cast<int32_t>(dims_.size());
-}
+int32_t Tensor::dims_size() const { return static_cast<int32_t>(dims_.size()); }
 
-base::DataType Tensor::data_type() const {
-  return data_type_;
-}
+base::DataType Tensor::data_type() const { return data_type_; }
 
 void Tensor::reshape(const std::vector<int32_t>& dims) {
-  size_t size = MultiplyAcc(dims.begin(), dims.end(), 1);
+  size_t size = ReduceDimension(dims.begin(), dims.end(), 1);
   if (!buffer_) {
     this->dims_ = dims;
     this->size_ = size;
@@ -156,8 +155,8 @@ void Tensor::reshape(const std::vector<int32_t>& dims) {
   }
 
   if (size != size_) {
-    auto new_buffer = std::make_shared<base::Buffer>(size * base::DataTypeSize(this->data_type_),
-                                                     buffer_->allocator());
+    auto new_buffer = std::make_shared<base::Buffer>(
+        size * base::DataTypeSize(this->data_type_), buffer_->allocator());
     CHECK(new_buffer->allocate());
     new_buffer->copy_from(buffer_.get());
     this->buffer_ = new_buffer;
@@ -174,7 +173,7 @@ std::vector<size_t> Tensor::strides() const {
   std::vector<size_t> strides;
   if (!dims_.empty()) {
     for (int32_t i = 0; i < dims_.size() - 1; ++i) {
-      size_t stride = MultiplyAcc(dims_.begin() + i + 1, dims_.end(), 1);
+      size_t stride = ReduceDimension(dims_.begin() + i + 1, dims_.end(), 1);
       strides.push_back(stride);
     }
     strides.push_back(1);
