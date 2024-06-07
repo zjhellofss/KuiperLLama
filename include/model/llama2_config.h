@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_MODEL_LLAMA_CONFIG_H_
-#define LC_INCLUDE_MODEL_LLAMA_CONFIG_H_
+#ifndef KUIPER_INCLUDE_MODEL_LLAMA_CONFIG_H_
+#define KUIPER_INCLUDE_MODEL_LLAMA_CONFIG_H_
 namespace model {
 struct LLamaModelConfig {
   int32_t dim = 0;
@@ -11,4 +11,4 @@ struct LLamaModelConfig {
   int32_t seq_len = 0;
 };
 }  // namespace model
-#endif  // LC_INCLUDE_MODEL_LLAMA_CONFIG_H_
+#endif  // KUIPER_INCLUDE_MODEL_LLAMA_CONFIG_H_

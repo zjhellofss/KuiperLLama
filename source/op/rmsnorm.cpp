@@ -27,22 +27,21 @@ base::Status RmsNormLayer::base_forward() {
 }
 
 base::Status RmsNormLayer::check() const {
-  auto inout_status = check_inout(1, 1, device_type_, base::DataType::kDataTypeFp32);
-  if (!inout_status) {
-    return inout_status;
-  }
-  auto wei_status = check_weight(1, device_type_, base::DataType::kDataTypeFp32);
-  if (!wei_status) {
-    return wei_status;
+  auto status = check_tensor_with_dim(get_input(0), device_type_, data_type_, dim_);
+  if (!status) {
+    return status;
   }
 
-  if (this->get_input(0).size() != dim_) {
-    return base::error::InternalError("The size of input tensor is not equal to dim");
+  status = check_tensor_with_dim(get_weight(0), device_type_, data_type_, dim_);
+  if (!status) {
+    return status;
   }
 
-  if (this->get_output(0).size() != dim_) {
-    return base::error::InternalError("The size of output tensor is not equal to dim");
+  status = check_tensor_with_dim(get_output(0), device_type_, data_type_, dim_);
+  if (!status) {
+    return status;
   }
+
   return base::error::Success();
 }
 

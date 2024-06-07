@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_OP_H
-#define LC_INCLUDE_OP_H
+#ifndef KUIPER_INCLUDE_OP_H
+#define KUIPER_INCLUDE_OP_H
 #include "layer.h"
 namespace op {
 class SoftmaxLayer : public Layer {
@@ -11,4 +11,4 @@ class SoftmaxLayer : public Layer {
   base::Status base_forward() override;
 };
 }  // namespace op
-#endif  // LC_INCLUDE_OP_H
+#endif  // KUIPER_INCLUDE_OP_H

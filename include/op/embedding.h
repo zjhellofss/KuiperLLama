@@ -1,6 +1,6 @@
 
-#ifndef LC_INCLUDE_OP_EMBEDDING_H_
-#define LC_INCLUDE_OP_EMBEDDING_H_
+#ifndef KUIPER_INCLUDE_OP_EMBEDDING_H_
+#define KUIPER_INCLUDE_OP_EMBEDDING_H_
 #include "layer.h"
 namespace op {
 class EmbeddingLayer : public LayerFp32Param {
@@ -18,4 +18,4 @@ class EmbeddingLayer : public LayerFp32Param {
   int32_t vocab_size_ = 0;
 };
 }  // namespace op
-#endif  // LC_INCLUDE_OP_EMBEDDING_H_
+#endif  // KUIPER_INCLUDE_OP_EMBEDDING_H_

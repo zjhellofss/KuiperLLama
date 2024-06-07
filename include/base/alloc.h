@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_BASE_ALLOC_H_
-#define LC_INCLUDE_BASE_ALLOC_H_
+#ifndef KUIPER_INCLUDE_BASE_ALLOC_H_
+#define KUIPER_INCLUDE_BASE_ALLOC_H_
 #include <memory>
 #include "base.h"
 namespace base {
@@ -47,4 +47,4 @@ class CPUDeviceAllocatorFactory {
 };
 
 }  // namespace base
-#endif  // LC_INCLUDE_BASE_ALLOC_H_
+#endif  // KUIPER_INCLUDE_BASE_ALLOC_H_

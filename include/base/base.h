@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_BASE_BASE_H_
-#define LC_INCLUDE_BASE_BASE_H_
+#ifndef KUIPER_INCLUDE_BASE_BASE_H_
+#define KUIPER_INCLUDE_BASE_BASE_H_
 #include <glog/logging.h>
 #include <cstdint>
 #include <string>
@@ -114,4 +114,4 @@ Status InvalidArgument(const std::string& err_msg = "");
 std::ostream& operator<<(std::ostream& os, const Status& x);
 
 }  // namespace base
-#endif  // LC_INCLUDE_BASE_BASE_H_
+#endif  // KUIPER_INCLUDE_BASE_BASE_H_

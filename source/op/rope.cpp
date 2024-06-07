@@ -1,7 +1,8 @@
 #include "op/rope.h"
 #include <cmath>
 namespace op {
-RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim, int32_t head_size)
+RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim,
+                     int32_t head_size)
     : Layer(device_type, LayerType::kLayerRoPe, "RoPe"),
       dim_(dim),
       kv_dim_(kv_dim),
@@ -22,8 +23,8 @@ base::Status RoPELayer::base_forward() {
 
   for (int32_t i = 0; i < dim_; i += 2) {
     int32_t head_dim = i % head_size_;
-    float freq =
-        1.0f / std::pow(10000.0f, static_cast<float>(head_dim) / static_cast<float>(head_size_));
+    float freq = 1.0f / std::pow(10000.0f, static_cast<float>(head_dim) /
+                                               static_cast<float>(head_size_));
     float val = static_cast<float>(pos) * freq;
     float fcr = std::cos(val);
     float fci = std::sin(val);
@@ -41,25 +42,25 @@ base::Status RoPELayer::base_forward() {
 }
 
 base::Status RoPELayer::check() const {
-  auto status = check_inout_size(3, 1);
-  if (!status) {
-    return status;
-  }
-
-  status = check_single_input(2, device_type_, base::DataType::kDataTypeInt32);
-  if (!status) {
-    return status;
-  }
-
-  status = check_single_input(1, device_type_, base::DataType::kDataTypeFp32);
-  if (!status) {
-    return status;
-  }
-
-  status = check_single_input(0, device_type_, base::DataType::kDataTypeFp32);
-  if (!status) {
-    return status;
-  }
+//  auto status = check_inout_num(3, 1);
+//  if (!status) {
+//    return status;
+//  }
+//
+//  status = check_tensor(get_input(2), device_type_, base::DataType::kDataTypeInt32);
+//  if (!status) {
+//    return status;
+//  }
+//
+//  status = check_tensor(get_input(1), device_type_, data_type_);
+//  if (!status) {
+//    return status;
+//  }
+//
+//  status = check_tensor(get_input(0), device_type_, data_type_);
+//  if (!status) {
+//    return status;
+//  }
 
   return base::error::Success();
 }

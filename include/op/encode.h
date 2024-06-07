@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_OP_ENCODE_H_
-#define LC_INCLUDE_OP_ENCODE_H_
+#ifndef KUIPER_INCLUDE_OP_ENCODE_H_
+#define KUIPER_INCLUDE_OP_ENCODE_H_
 #include <sentencepiece_processor.h>
 #include "layer.h"
 namespace op {
@@ -23,4 +23,4 @@ class EncodeLayer : public Layer {
   std::unique_ptr<sentencepiece::SentencePieceProcessor> spe;
 };
 }  // namespace op
-#endif  // LC_INCLUDE_OP_ENCODE_H_
+#endif  // KUIPER_INCLUDE_OP_ENCODE_H_

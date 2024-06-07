@@ -6,21 +6,17 @@ SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)
 }
 
 base::Status SwiGLULayer::check() const {
-  auto status = check_inout(2, 1, device_type_, base::DataType::kDataTypeFp32);
+  base::Status status;
+  for (int32_t i = 0; i < 2; ++i) {
+    status = check_tensor_with_dim(get_input(0), device_type_, data_type_, hidden_dim_);
+    if (!status) {
+      return status;
+    }
+  }
+
+  status = check_tensor_with_dim(get_output(0), device_type_, data_type_, hidden_dim_);
   if (!status) {
     return status;
-  }
-
-  if (this->get_input(0).size() != hidden_dim_) {
-    return base::error::InternalError("The size of input tensor 0 is not equal to hidden dim.");
-  }
-
-  if (this->get_input(1).size() != hidden_dim_) {
-    return base::error::InternalError("The size of input tensor 1 is not equal to hidden dim.");
-  }
-
-  if (this->get_output(0).size() != hidden_dim_) {
-    return base::error::InternalError("The size of output tensor is not equal to hidden dim");
   }
   return base::error::Success();
 }

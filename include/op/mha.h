@@ -1,5 +1,5 @@
-#ifndef LC_INLCUDE_MHA_H
-#define LC_INLCUDE_MHA_H
+#ifndef KUIPER_INLCUDE_MHA_H
+#define KUIPER_INLCUDE_MHA_H
 #include "layer.h"
 #include "softmax.h"
 namespace op {
@@ -27,4 +27,4 @@ class MultiHeadAttention : public Layer {
   std::unique_ptr<op::SoftmaxLayer> softmax_;
 };
 }  // namespace op
-#endif  // LC_INLCUDE_MHA_H
+#endif  // KUIPER_INLCUDE_MHA_H

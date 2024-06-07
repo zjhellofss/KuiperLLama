@@ -1,7 +1,8 @@
 #include "op/mha.h"
 namespace op {
-MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t kv_mul, int32_t kv_dim,
-                                       int32_t seq_len, int32_t head_num, int32_t head_size)
+MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t kv_mul,
+                                       int32_t kv_dim, int32_t seq_len, int32_t head_num,
+                                       int32_t head_size)
     : Layer(device_type, LayerType::kLayerMHA, "MultiHead"),
       kv_mul_(kv_mul),
       kv_dim_(kv_dim),
@@ -34,25 +35,26 @@ base::Status MultiHeadAttention::base_forward() {
     arma::fmat key_mat(key_tensor.ptr<float>(), head_size_, pos_ + 1, false, true);
 
     for (int32_t t = 0; t <= pos_; t++) {
-      float* key_head_addr =
-          key_cache_tensor.ptr<float>() + layer_offset + t * kv_dim_ + (h / kv_mul_) * head_size_;
+      float* key_head_addr = key_cache_tensor.ptr<float>() + layer_offset + t * kv_dim_ +
+                             (h / kv_mul_) * head_size_;
       arma::fvec key_head_vec(key_head_addr, head_size_, false, true);
       key_mat.col(t) = key_head_vec;
     }
 
     score = (query * key_mat) / std::sqrt(static_cast<float>(head_size_));
-    auto score_head_buffer =
-        std::make_shared<base::Buffer>((pos_ + 1) * sizeof(float), nullptr, score_head_addr, true);
+    auto score_head_buffer = std::make_shared<base::Buffer>(
+        (pos_ + 1) * sizeof(float), nullptr, score_head_addr, true);
     score_head_buffer->set_device_type(device_type_);
     tensor::Tensor score_head_tensor(base::DataType::kDataTypeFp32, pos_ + 1);
     score_head_tensor.assign(score_head_buffer);
     softmax_->forward_i1o1(score_head_tensor, score_head_tensor);
 
-    arma::fvec output_head(mha_out.ptr<float>() + h * head_size_, head_size_, false, true);
+    arma::fvec output_head(mha_out.ptr<float>() + h * head_size_, head_size_, false,
+                           true);
     for (int32_t t = 0; t <= pos_; t++) {
       const float score_value = score.at(t);
-      float* value_head_addr =
-          value_cache_tensor.ptr<float>() + layer_offset + t * kv_dim_ + (h / kv_mul_) * head_size_;
+      float* value_head_addr = value_cache_tensor.ptr<float>() + layer_offset +
+                               t * kv_dim_ + (h / kv_mul_) * head_size_;
       arma::fvec value(value_head_addr, head_size_, false, true);
       if (!t) {
         output_head = score_value * value;
@@ -73,7 +75,14 @@ void MultiHeadAttention::set_layer_index(int32_t layer_index) {
 }
 
 base::Status MultiHeadAttention::check() const {
-  return check_inout(5, 1, device_type_, base::DataType::kDataTypeFp32);
+  base::Status status;
+  for (int32_t i = 0; i < 5; ++i) {
+    status = check_tensor(get_input(i), device_type_, data_type_);
+    if (!status) {
+      return status;
+    }
+  }
+  return check_tensor(get_output(0), device_type_, data_type_);
 }
 
 }  // namespace op

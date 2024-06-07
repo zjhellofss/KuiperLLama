@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_MODEL_MODEL_H_
-#define LC_INCLUDE_MODEL_MODEL_H_
+#ifndef KUIPER_INCLUDE_MODEL_MODEL_H_
+#define KUIPER_INCLUDE_MODEL_MODEL_H_
 #include <map>
 #include <string>
 #include "llama2_config.h"
@@ -77,4 +77,4 @@ class Model {
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
 };
 }  // namespace model
-#endif  // LC_INCLUDE_MODEL_MODEL_H_
+#endif  // KUIPER_INCLUDE_MODEL_MODEL_H_

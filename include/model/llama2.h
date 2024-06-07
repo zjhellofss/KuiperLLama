@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_MODEL_LLAMA_H_
-#define LC_INCLUDE_MODEL_LLAMA_H_
+#ifndef KUIPER_INCLUDE_MODEL_LLAMA_H_
+#define KUIPER_INCLUDE_MODEL_LLAMA_H_
 #include <map>
 #include "model.h"
 #include "op/add.h"

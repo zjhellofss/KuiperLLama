@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_TENSOR_TENSOR_H_
-#define LC_INCLUDE_TENSOR_TENSOR_H_
+#ifndef KUIPER_INCLUDE_TENSOR_TENSOR_H_
+#define KUIPER_INCLUDE_TENSOR_TENSOR_H_
 #include <glog/logging.h>
 #include <armadillo>
 #include <memory>
@@ -145,4 +145,4 @@ void Tensor::transpose_dim12(Tensor dst) {
   }
 }
 }  // namespace tensor
-#endif  // LC_INCLUDE_TENSOR_TENSOR_H_
+#endif  // KUIPER_INCLUDE_TENSOR_TENSOR_H_

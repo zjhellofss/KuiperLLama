@@ -1,5 +1,5 @@
-#ifndef LC_INCLUDE_OP_ROPE_H_
-#define LC_INCLUDE_OP_ROPE_H_
+#ifndef KUIPER_INCLUDE_OP_ROPE_H_
+#define KUIPER_INCLUDE_OP_ROPE_H_
 #include "layer.h"
 namespace op {
 class RoPELayer : public Layer {
@@ -16,4 +16,4 @@ class RoPELayer : public Layer {
   int32_t head_size_ = 0;
 };
 }  // namespace op
-#endif  // LC_INCLUDE_OP_ROPE_H_
+#endif  // KUIPER_INCLUDE_OP_ROPE_H_
