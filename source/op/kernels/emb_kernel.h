@@ -8,7 +8,7 @@
 #include "tensor/tensor.h"
 namespace kernel {
 typedef void (*EmbeddingKernel)(const tensor::Tensor& input, const tensor::Tensor& weight,
-                                tensor::Tensor output, int32_t vocab_size);
+                                const tensor::Tensor& output, int32_t vocab_size);
 
 EmbeddingKernel get_emb_kernel(base::DeviceType device_type);
 }  // namespace kernel

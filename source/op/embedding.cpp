@@ -21,17 +21,20 @@ base::Status EmbeddingLayer::check() const {
   base::Status status = check_tensor_with_dim(input_tensor, device_type_,
                                               base::DataType::kDataTypeInt32, seq_len_);
   if (!status) {
+    LOG(ERROR) << "The input tensor error in the embedding layer.";
     return status;
   }
 
   status =
       check_tensor_with_dim(get_weight(0), device_type_, data_type_, vocab_size_, dim_);
   if (!status) {
+    LOG(ERROR) << "The weight tensor error in the embedding layer.";
     return status;
   }
 
   status = check_tensor_with_dim(get_output(0), device_type_, data_type_, seq_len_, dim_);
   if (!status) {
+    LOG(ERROR) << "The output tensor error in the embedding layer.";
     return status;
   }
   return base::error::Success();

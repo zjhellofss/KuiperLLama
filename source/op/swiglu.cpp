@@ -1,4 +1,5 @@
 #include "op/swiglu.h"
+#include "kernels/swiglu_kernel.h"
 #include "op/layer.h"
 namespace op {
 SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)
@@ -7,15 +8,19 @@ SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)
 
 base::Status SwiGLULayer::check() const {
   base::Status status;
-  for (int32_t i = 0; i < 2; ++i) {
+  const int32_t input_tensor_num = 2;
+  for (int32_t i = 0; i < input_tensor_num; ++i) {
     status = check_tensor_with_dim(get_input(0), device_type_, data_type_, hidden_dim_);
     if (!status) {
+      LOG(ERROR) << "The input tensor " << std::to_string(i)
+                 << " error in the swiglu layer.";
       return status;
     }
   }
 
   status = check_tensor_with_dim(get_output(0), device_type_, data_type_, hidden_dim_);
   if (!status) {
+    LOG(ERROR) << "The output tensor error in the swiglu layer.";
     return status;
   }
   return base::error::Success();
@@ -28,11 +33,8 @@ base::Status SwiGLULayer::base_forward() {
   }
   auto input1 = this->get_input(0);
   auto input2 = this->get_input(1);
-  arma::fvec input1_vec(input1.ptr<float>(), input1.size(), false, true);
-  arma::fvec input2_vec(input2.ptr<float>(), input2.size(), false, true);
-
-  input1_vec %= (1.0f / (1.0f + arma::exp(-input1_vec)));
-  input1_vec %= input2_vec;
+  auto output = this->get_output(0);
+  kernel::get_swiglu_kernel(base::DeviceType::kDeviceCPU)(input1, input2, output);
   return base::error::Success();
 }
 

@@ -2,7 +2,7 @@
 namespace kernel {
 
 void emb_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight,
-                    tensor::Tensor output, int32_t vocab_size) {
+                    const tensor::Tensor& output, int32_t vocab_size) {
   const int32_t input_num = static_cast<int32_t>(input.size());
   const int32_t weight_dim = weight.get_dim(1);
 

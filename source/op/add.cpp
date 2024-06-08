@@ -12,16 +12,19 @@ base::Status VecAddLayer::check() const {
   base::Status status;
   status = check_tensor_with_dim(input1, device_type_, data_type_, size);
   if (!status) {
+    LOG(ERROR) << "The input tensor 1 error in the add layer.";
     return status;
   }
 
   status = check_tensor_with_dim(input2, device_type_, data_type_, size);
   if (!status) {
+    LOG(ERROR) << "The input tensor 2 error in the add layer.";
     return status;
   }
 
   status = check_tensor_with_dim(get_output(0), device_type_, data_type_, size);
   if (!status) {
+    LOG(ERROR) << "The output tensor error in the add layer.";
     return status;
   }
   return base::error::Success();
@@ -35,12 +38,6 @@ base::Status VecAddLayer::base_forward() {
   auto input1 = this->get_input(0);
   auto input2 = this->get_input(1);
   auto output = this->get_output(0);
-  if (input1.size() != input2.size()) {
-    return base::error::InternalError("The input size of two tensors are not match.");
-  }
-  if (input1.size() != output.size()) {
-    return base::error::InternalError("The input and output size are not match.");
-  }
   kernel::get_add_kernel(device_type_)(input1, input2, output);
   return base::error::Success();
 }

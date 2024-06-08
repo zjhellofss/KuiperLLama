@@ -1,0 +1,71 @@
+#include "mha_kernel.h"
+namespace kernel {
+
+static void softmax_inplace(const tensor::Tensor& input) {
+  int32_t size = static_cast<int32_t>(input.size());
+  const float* input_ptr = input.ptr<float>();
+
+  float max_value = *std::max(input_ptr, input_ptr + size);
+  arma::fvec input_mat(const_cast<float*>(input_ptr), size, false, true);
+  input_mat = arma::exp(input_mat - max_value);
+
+  float sum_value = arma::sum(input_mat);
+  input_mat = input_mat / sum_value;
+}
+
+void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_len,
+                    int32_t kv_dim, int32_t kv_mul, int32_t head_size,
+                    const tensor::Tensor& mha_out, const tensor::Tensor& query_tensor,
+                    const tensor::Tensor& score_tensor,
+                    const tensor::Tensor& key_cache_tensor,
+                    const tensor::Tensor& value_cache_tensor,
+                    const tensor::Tensor& key_tensor) {
+  int32_t layer_offset = layer_index * seq_len * kv_dim;
+  for (int32_t h = 0; h < head_num; ++h) {
+    const float* score_head_addr = score_tensor.ptr<float>() + h * seq_len;
+    const float* query_head_addr = query_tensor.ptr<float>() + h * head_size;
+    arma::fmat query(const_cast<float*>(query_head_addr), 1, head_size, false, true);
+    arma::fmat score(const_cast<float*>(score_head_addr), 1, pos + 1, false, true);
+    arma::fmat key_mat(const_cast<float*>(key_tensor.ptr<float>()), head_size, pos + 1,
+                       false, true);
+
+    for (int32_t t = 0; t <= pos; t++) {
+      const float* key_head_addr = key_cache_tensor.ptr<float>() + layer_offset +
+                                   t * kv_dim + (h / kv_mul) * head_size;
+      arma::fvec key_head_vec(const_cast<float*>(key_head_addr), head_size, false, true);
+      key_mat.col(t) = key_head_vec;
+    }
+
+    score = (query * key_mat) / std::sqrt(static_cast<float>(head_size));
+    auto score_head_buffer = std::make_shared<base::Buffer>(
+        (pos + 1) * sizeof(float), nullptr, const_cast<float*>(score_head_addr), true);
+    score_head_buffer->set_device_type(base::DeviceType::kDeviceCPU);
+    tensor::Tensor score_head_tensor(base::DataType::kDataTypeFp32, pos + 1);
+    score_head_tensor.assign(score_head_buffer);
+    softmax_inplace(score_head_tensor);
+
+    arma::fvec output_head(const_cast<float*>(mha_out.ptr<float>()) + h * head_size,
+                           head_size, false, true);
+    for (int32_t t = 0; t <= pos; t++) {
+      const float score_value = score.at(t);
+      const float* value_head_addr = value_cache_tensor.ptr<float>() + layer_offset +
+                                     t * kv_dim + (h / kv_mul) * head_size;
+      arma::fvec value(const_cast<float*>(value_head_addr), head_size, false, true);
+      if (!t) {
+        output_head = score_value * value;
+      } else {
+        output_head += score_value * value;
+      }
+    }
+  }
+}
+
+MHAKernel get_mha_kernel(base::DeviceType device_type) {
+  if (device_type == base::DeviceType::kDeviceCPU) {
+    return mha_kernel_cpu;
+  } else {
+    LOG(FATAL) << "Unknown device type for get an mha kernel.";
+    return nullptr;
+  }
+}
+}  // namespace kernel

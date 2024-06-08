@@ -65,7 +65,8 @@ class LLama2Model : public Model {
 
   const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const override;
 
-  base::Status insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor) override;
+  base::Status insert_buffer(ModelBufferType buffer_idx,
+                             const tensor::Tensor& tensor) override;
 
  private:
   int32_t kv_dim_ = 0;
@@ -88,7 +89,7 @@ class LLama2Model : public Model {
   std::unique_ptr<op::RoPELayer> rope_layer_;
   std::unique_ptr<op::SwiGLULayer> swiglu_layer_;
 
-  std::unique_ptr<op::MultiHeadAttention> mha_layer_;
+  std::vector<std::unique_ptr<op::MultiHeadAttention>> mha_layers_;
   std::vector<std::unique_ptr<op::MatmulLayer>> wq_layers_;
   std::vector<std::unique_ptr<op::MatmulLayer>> wk_layers_;
   std::vector<std::unique_ptr<op::MatmulLayer>> wv_layers_;
