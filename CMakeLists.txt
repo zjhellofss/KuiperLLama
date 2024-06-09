@@ -10,6 +10,7 @@ aux_source_directory(./source/base/ DIR_BASE)
 aux_source_directory(./source/op/ DIR_OP)
 aux_source_directory(./source/model/ DIR_MODEL)
 aux_source_directory(./source/op/kernels DIR_KERNEL)
+aux_source_directory(./source/sampler DIR_KERNEL)
 
 add_executable(llama_infer main.cpp ${DIR_TENSOR} ${DIR_BASE} ${DIR_OP} ${DIR_MODEL} ${DIR_KERNEL})
 target_link_libraries(llama_infer glog::glog)

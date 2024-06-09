@@ -11,6 +11,7 @@
 #include "op/mha.h"
 #include "op/rmsnorm.h"
 #include "op/rope.h"
+#include "sampler/argmax_sampler.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
 
@@ -73,6 +74,7 @@ class Model {
   bool is_shared_weight_ = false;
   std::string token_path_;
   std::string model_path_;
+  std::unique_ptr<sampler::ArgmaxSampler> sampler_;
   base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
 };

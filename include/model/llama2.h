@@ -21,6 +21,12 @@ struct LLamaRawModelData {
   bool is_weight_valid(size_t peek) const;
 };
 
+struct EmbeddingOutput {
+  tensor::Tensor input_tokens;
+  tensor::Tensor input_embeddings;
+  tensor::Tensor input_token_num;
+};
+
 class LLama2Model : public Model {
  public:
   explicit LLama2Model(std::string token_path, std::string model_path);
@@ -68,6 +74,19 @@ class LLama2Model : public Model {
   base::Status insert_buffer(ModelBufferType buffer_idx,
                              const tensor::Tensor& tensor) override;
 
+  void attention_mha_o(int32_t layer_idx, int32_t pos);
+
+  EmbeddingOutput prepare_input(const std::vector<int>& tokens);
+
+  void attn_rmsnorm(const tensor::Tensor& input, int32_t layer_idx);
+
+  void feed_forward(const tensor::Tensor& input, int32_t layer_idx);
+
+  void fill_input(int32_t pos, int32_t next, const std::vector<int32_t>& tokens,
+                  tensor::Tensor& input, const EmbeddingOutput& embedding_output);
+
+  void attention_qkv(int32_t layer_idx, int32_t pos, const tensor::Tensor& pos_tensor);
+
  private:
   int32_t kv_dim_ = 0;
   int32_t kv_mul_ = 0;
@@ -81,27 +100,27 @@ class LLama2Model : public Model {
   int32_t kv_head_num_ = 0;
   int32_t seq_len_ = 0;
 
-  std::unique_ptr<LLamaRawModelData> raw_model_data_;
+  std::shared_ptr<LLamaRawModelData> raw_model_data_;
   std::map<ModelBufferType, tensor::Tensor> buffers_;
   std::unique_ptr<op::EncodeLayer> encode_layer_;
 
-  std::unique_ptr<op::VecAddLayer> add_layer_;
-  std::unique_ptr<op::RoPELayer> rope_layer_;
-  std::unique_ptr<op::SwiGLULayer> swiglu_layer_;
+  std::shared_ptr<op::VecAddLayer> add_layer_;
+  std::shared_ptr<op::RoPELayer> rope_layer_;
+  std::shared_ptr<op::SwiGLULayer> swiglu_layer_;
 
-  std::vector<std::unique_ptr<op::MultiHeadAttention>> mha_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wq_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wk_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wv_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> wo_layers_;
+  std::vector<std::shared_ptr<op::MultiHeadAttention>> mha_layers_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> wq_layers_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> wk_layers_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> wv_layers_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> wo_layers_;
 
-  std::vector<std::unique_ptr<op::MatmulLayer>> w1_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> w2_layers_;
-  std::vector<std::unique_ptr<op::MatmulLayer>> w3_layers_;
-  std::unique_ptr<op::MatmulLayer> cls_layer_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> w1_layers_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> w2_layers_;
+  std::vector<std::shared_ptr<op::MatmulLayer>> w3_layers_;
+  std::shared_ptr<op::MatmulLayer> cls_layer_;
 
-  std::unique_ptr<op::EmbeddingLayer> embedding_layer_;
-  std::vector<std::unique_ptr<op::RmsNormLayer>> rmsnorm_layers_;
+  std::shared_ptr<op::EmbeddingLayer> embedding_layer_;
+  std::vector<std::shared_ptr<op::RmsNormLayer>> rmsnorm_layers_;
 };
 }  // namespace model
 

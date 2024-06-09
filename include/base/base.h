@@ -82,7 +82,7 @@ class Status {
 };
 
 namespace error {
-#define StatusCheck(call)                                                                  \
+#define STATUS_CHECK(call)                                                                  \
   do {                                                                                     \
     const base::Status& status = call;                                                     \
     if (!status) {                                                                         \

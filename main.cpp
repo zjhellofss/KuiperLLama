@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
   model.init(base::DeviceType::kDeviceCPU);
   std::string sentence = "Hi everyone";
   const auto& tokens = model.encode(sentence);
-  const auto s = model.forward(tokens, 256);
+  const auto s = model.forward(tokens, 12);
 
   LOG(INFO) << s;
   return 0;
