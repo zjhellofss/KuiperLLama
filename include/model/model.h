@@ -36,9 +36,23 @@ enum class ModelBufferType {
   kForwardOutput = 15,
 };
 
+struct RawModelData {
+  int32_t fd = -1;
+  size_t file_size = 0;
+  float* data = nullptr;
+  float* weight_data = nullptr;
+
+  ~RawModelData();
+
+  const float* weight(size_t offset) const;
+
+  bool is_weight_valid(size_t peek) const;
+};
+
 class Model {
  public:
-  explicit Model(base::ModelType model_type, std::string token_path, std::string model_path);
+  explicit Model(base::ModelType model_type, std::string token_path,
+                 std::string model_path);
 
   virtual base::Status init(base::DeviceType device_type) = 0;
 
@@ -50,6 +64,21 @@ class Model {
 
   const std::string& model_path() const;
 
+ protected:
+  virtual tensor::Tensor& get_buffer(ModelBufferType buffer_idx);
+
+  virtual const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const;
+
+  virtual base::Status insert_buffer(ModelBufferType buffer_idx,
+                                     const tensor::Tensor& tensor);
+
+ protected:
+  virtual base::Status read_model_file();
+
+  virtual base::Status create_encode_layer();
+
+  virtual base::Status generate_model_infos(const ModelConfig& config);
+
  private:
   virtual void init_mem() = 0;
 
@@ -57,24 +86,31 @@ class Model {
 
   virtual base::Status create_layers() = 0;
 
-  virtual base::Status read_model_file() = 0;
-
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
-
-  virtual tensor::Tensor& get_buffer(ModelBufferType buffer_idx) = 0;
-
-  virtual const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const = 0;
-
-  virtual base::Status insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor) = 0;
 
   virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
                                                                    int32_t token_pos) = 0;
 
  protected:
+  int32_t kv_dim_ = 0;
+  int32_t kv_mul_ = 0;
+  int32_t head_size_ = 0;
+  int32_t vocab_size_ = 0;
+
+  int32_t dim_ = 0;
+  int32_t hidden_dim_ = 0;
+  int32_t layer_num_ = 0;
+  int32_t head_num_ = 0;
+  int32_t kv_head_num_ = 0;
+  int32_t seq_len_ = 0;
   bool is_shared_weight_ = false;
+
   std::string token_path_;
   std::string model_path_;
+  std::unique_ptr<op::EncodeLayer> encode_layer_;
+  std::map<ModelBufferType, tensor::Tensor> buffers_;
   std::unique_ptr<sampler::ArgmaxSampler> sampler_;
+  std::shared_ptr<RawModelData> raw_model_data_;
   base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
 };

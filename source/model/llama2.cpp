@@ -7,28 +7,6 @@
 #include <utility>
 #include "base/tick.h"
 namespace model {
-LLamaRawModelData::~LLamaRawModelData() {
-  if (data != nullptr && data != MAP_FAILED) {
-    munmap(data, file_size);
-    data = nullptr;
-  }
-  if (fd != -1) {
-    close(fd);
-    fd = -1;
-  }
-}
-
-const float* LLamaRawModelData::weight(size_t offset) const {
-  return weight_data + offset;
-}
-
-bool LLamaRawModelData::is_weight_valid(size_t peek) const {
-  if (peek * sizeof(float) < file_size) {
-    return true;
-  } else {
-    return false;
-  }
-}
 
 LLama2Model::LLama2Model(std::string token_path, std::string model_path)
     : Model(base::ModelType::kModelTypeLLama2, std::move(token_path),
@@ -97,87 +75,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     pos += 1;
   }
   TOCK(A)
+  std::cout << "word(pos) number: " << pos;
   return base::error::Success();
-}
-
-base::Status LLama2Model::generate_llama_infos(const LLamaModelConfig& config) {
-  dim_ = config.dim;
-  hidden_dim_ = config.hidden_dim;
-  layer_num_ = config.layer_num;
-  head_num_ = config.head_num;
-  kv_head_num_ = config.head_num;
-  seq_len_ = config.seq_len;
-
-  kv_dim_ = (config.dim * config.kv_head_num) / config.head_num;
-  kv_mul_ = config.head_num / config.kv_head_num;
-  head_size_ = config.dim / config.head_num;
-
-  if (config.vocab_size > 0) {
-    is_shared_weight_ = true;
-  } else {
-    is_shared_weight_ = false;
-  }
-
-  if (std::abs(config.vocab_size) != vocab_size_) {
-    return base::error::ModelParseError(
-        "Vocabulary size mismatch between the model file and the token list.");
-  }
-  return base::error::Success();
-}
-
-base::Status LLama2Model::read_model_file() {
-  using namespace base;
-  if (model_path_.empty()) {
-    return error::PathNotValid(
-        "Failed to open the weight file, the model path is empty!");
-  }
-  int32_t fd = open(model_path_.data(), O_RDONLY);
-  if (fd == -1) {
-    return error::PathNotValid("Failed to open the weight file " + model_path_ +
-                               " may be the path does not exist!");
-  }
-
-  FILE* file = fopen(model_path_.data(), "rb");
-  if (!file) {
-    return error::PathNotValid("Failed to open the file. The path may be invalid.");
-  }
-
-  auto config = LLamaModelConfig{};
-  if (fread(&config, sizeof(LLamaModelConfig), 1, file) != 1) {
-    return error::ModelParseError(
-        "Failed to retrieve the configuration information from the model "
-        "file.");
-  }
-
-  auto gen_status = generate_llama_infos(config);
-  if (!gen_status) {
-    return gen_status;
-  }
-
-  raw_model_data_ = std::make_shared<LLamaRawModelData>();
-  fseek(file, 0, SEEK_END);
-  raw_model_data_->file_size = ftell(file);
-  fclose(file);
-
-  raw_model_data_->fd = fd;
-  raw_model_data_->data =
-      static_cast<float*>(mmap(nullptr, raw_model_data_->file_size, PROT_READ,
-                               MAP_PRIVATE, raw_model_data_->fd, 0));
-
-  if (raw_model_data_->data == MAP_FAILED || raw_model_data_->data == nullptr) {
-    return error::ModelParseError("Failed to map the weight file " + model_path_ +
-                                  " into memory.");
-  }
-
-  raw_model_data_->weight_data =
-      raw_model_data_->data + sizeof(LLamaModelConfig) / sizeof(float);
-  if (raw_model_data_ == nullptr) {
-    LOG(ERROR);
-    return error::ModelParseError(
-        "Failed to map the weight file " + model_path_ +
-        " into memory, the pointer to weight start address is null");
-  }
-  return error::Success();
 }
 
 base::Status LLama2Model::gen_model_from_file() {
@@ -448,29 +347,6 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
 }
 
-base::Status LLama2Model::insert_buffer(ModelBufferType buffer_idx,
-                                        const tensor::Tensor& tensor) {
-  if (buffers_.count(buffer_idx) > 0) {
-    return base::error::KeyHasExits(std::to_string(int(buffer_idx)) +
-                                    " has exits in the buffers");
-  }
-  if (tensor.is_empty()) {
-    return base::error::InvalidArgument("The tensor is empty for inserting buffer.");
-  }
-  buffers_.insert({buffer_idx, tensor});
-  return base::error::Success();
-}
-
-tensor::Tensor& LLama2Model::get_buffer(ModelBufferType buffer_idx) {
-  CHECK_GT(buffers_.count(buffer_idx), 0) << int(buffer_idx);
-  return buffers_.at(buffer_idx);
-}
-
-const tensor::Tensor& LLama2Model::get_buffer(ModelBufferType buffer_idx) const {
-  CHECK_GT(buffers_.count(buffer_idx), 0);
-  return buffers_.at(buffer_idx);
-}
-
 std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
                                                                       int32_t token_pos) {
   int32_t layer_offset = layer_idx * seq_len_ * kv_dim_;
@@ -513,29 +389,6 @@ void LLama2Model::create_add_layer() {
   add_layer_ = std::make_shared<op::VecAddLayer>(device_type_);
   add_layer_->reset_input_size(2);
   add_layer_->reset_output_size(1);
-}
-
-base::Status LLama2Model::create_encode_layer() {
-  using namespace base;
-  std::unique_ptr<sentencepiece::SentencePieceProcessor> spe =
-      std::make_unique<sentencepiece::SentencePieceProcessor>();
-  const auto& status = spe->Load(token_path_);
-  if (!status.ok()) {
-    return error::PathNotValid(token_path_);
-  }
-
-  vocab_size_ = spe->GetPieceSize();
-  if (vocab_size_ <= 0) {
-    return error::InternalError("The vocab size param read error from the model file!");
-  }
-
-  // create token encode decode layer
-  encode_layer_ =
-      std::make_unique<op::EncodeLayer>(device_type_, true, false, std::move(spe));
-  if (!encode_layer_) {
-    return error::InternalError("Create the encode layer failed.");
-  }
-  return error::Success();
 }
 
 base::Status LLama2Model::create_layers() {

@@ -11,7 +11,8 @@ int main(int argc, char* argv[]) {
     LOG(INFO) << "Usage: ./demo checkpoint_path tokenizer_path ";
     return -1;
   }
-  std::shared_ptr<base::CPUDeviceAllocator> alloc = std::make_shared<base::CPUDeviceAllocator>();
+  std::shared_ptr<base::CPUDeviceAllocator> alloc =
+      std::make_shared<base::CPUDeviceAllocator>();
 
   const char* checkpoint_path = argv[1];  // e.g. out/model.bin
   const char* tokenizer_path = argv[2];
@@ -19,7 +20,7 @@ int main(int argc, char* argv[]) {
   model.init(base::DeviceType::kDeviceCPU);
   std::string sentence = "Hi everyone";
   const auto& tokens = model.encode(sentence);
-  const auto s = model.forward(tokens, 12);
+  const auto s = model.forward(tokens, 32);
 
   LOG(INFO) << s;
   return 0;

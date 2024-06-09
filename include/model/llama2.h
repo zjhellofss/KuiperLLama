@@ -8,19 +8,6 @@
 #include "op/swiglu.h"
 namespace model {
 
-struct LLamaRawModelData {
-  int32_t fd = -1;
-  size_t file_size = 0;
-  float* data = nullptr;
-  float* weight_data = nullptr;
-
-  ~LLamaRawModelData();
-
-  const float* weight(size_t offset) const;
-
-  bool is_weight_valid(size_t peek) const;
-};
-
 struct EmbeddingOutput {
   tensor::Tensor input_tokens;
   tensor::Tensor input_embeddings;
@@ -45,13 +32,7 @@ class LLama2Model : public Model {
 
   base::Status gen_model_from_file() override;
 
-  base::Status read_model_file() override;
-
   base::Status create_layers() override;
-
-  base::Status generate_llama_infos(const LLamaModelConfig& config);
-
-  base::Status create_encode_layer();
 
   void create_rope_layer();
 
@@ -67,13 +48,6 @@ class LLama2Model : public Model {
 
   void create_swiglu_layer();
 
-  tensor::Tensor& get_buffer(ModelBufferType buffer_idx) override;
-
-  const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const override;
-
-  base::Status insert_buffer(ModelBufferType buffer_idx,
-                             const tensor::Tensor& tensor) override;
-
   void attention_mha_o(int32_t layer_idx, int32_t pos);
 
   EmbeddingOutput prepare_input(const std::vector<int>& tokens);
@@ -88,22 +62,6 @@ class LLama2Model : public Model {
   void attention_qkv(int32_t layer_idx, int32_t pos, const tensor::Tensor& pos_tensor);
 
  private:
-  int32_t kv_dim_ = 0;
-  int32_t kv_mul_ = 0;
-  int32_t head_size_ = 0;
-  int32_t vocab_size_ = 0;
-
-  int32_t dim_ = 0;
-  int32_t hidden_dim_ = 0;
-  int32_t layer_num_ = 0;
-  int32_t head_num_ = 0;
-  int32_t kv_head_num_ = 0;
-  int32_t seq_len_ = 0;
-
-  std::shared_ptr<LLamaRawModelData> raw_model_data_;
-  std::map<ModelBufferType, tensor::Tensor> buffers_;
-  std::unique_ptr<op::EncodeLayer> encode_layer_;
-
   std::shared_ptr<op::VecAddLayer> add_layer_;
   std::shared_ptr<op::RoPELayer> rope_layer_;
   std::shared_ptr<op::SwiGLULayer> swiglu_layer_;
