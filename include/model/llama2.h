@@ -30,8 +30,6 @@ class LLama2Model : public Model {
  private:
   void init_mem() override;
 
-  base::Status gen_model_from_file() override;
-
   base::Status create_layers() override;
 
   void create_rope_layer();

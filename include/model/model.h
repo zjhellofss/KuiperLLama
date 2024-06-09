@@ -77,12 +77,12 @@ class Model {
 
   virtual base::Status create_encode_layer();
 
+  virtual base::Status gen_model_from_file();
+
   virtual base::Status generate_model_infos(const ModelConfig& config);
 
  private:
   virtual void init_mem() = 0;
-
-  virtual base::Status gen_model_from_file() = 0;
 
   virtual base::Status create_layers() = 0;
 

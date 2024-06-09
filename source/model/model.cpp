@@ -169,4 +169,29 @@ base::Status Model::create_encode_layer() {
   return error::Success();
 }
 
+base::Status Model::gen_model_from_file() {
+  using namespace base;
+
+  // init s entence piece processor
+  auto create_encode_status = create_encode_layer();
+  if (!create_encode_status) {
+    LOG(ERROR) << "Create the encode layer failed!";
+    return create_encode_status;
+  }
+
+  auto mmap_status = read_model_file();
+  if (!mmap_status) {
+    LOG(ERROR) << "Handle model file " << model_path_ << " failed!";
+    return mmap_status;
+  }
+
+  auto layer_create_status = create_layers();
+  if (!layer_create_status) {
+    LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed!";
+    return layer_create_status;
+  }
+
+  return error::Success();
+}
+
 }  // namespace model

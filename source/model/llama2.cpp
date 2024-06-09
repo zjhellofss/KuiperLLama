@@ -61,11 +61,11 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
     STATUS_CHECK(cls_layer_->forward_i1o1(input, forward_output));
 
-    const float* forward_output_ptr = forward_output.ptr<float>();
+    const float* forward_logist = forward_output.ptr<float>();
     if (pos < tokens.size() - 1) {
       next = tokens[pos + 1];
     } else {
-      next = sampler_->sample(forward_output_ptr, forward_output.size());
+      next = sampler_->sample(forward_logist, forward_output.size());
     }
     std::string output_str = this->encode_layer_->decode(next);
     std::cout << output_str << " " << std::flush;
@@ -77,31 +77,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   TOCK(A)
   std::cout << "word(pos) number: " << pos;
   return base::error::Success();
-}
-
-base::Status LLama2Model::gen_model_from_file() {
-  using namespace base;
-
-  // init s entence piece processor
-  auto create_encode_status = create_encode_layer();
-  if (!create_encode_status) {
-    LOG(ERROR) << "Create the encode layer failed!";
-    return create_encode_status;
-  }
-
-  auto mmap_status = read_model_file();
-  if (!mmap_status) {
-    LOG(ERROR) << "Handle model file " << model_path_ << " failed!";
-    return mmap_status;
-  }
-
-  auto layer_create_status = create_layers();
-  if (!layer_create_status) {
-    LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed!";
-    return layer_create_status;
-  }
-
-  return error::Success();
 }
 
 std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
