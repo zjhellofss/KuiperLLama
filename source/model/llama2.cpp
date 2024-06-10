@@ -51,7 +51,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
       // attention (wq wk wv @ input)
       attention_qkv(layer_idx, pos, pos_tensor);
       // multi-head attention
-      attention_mha_o(layer_idx, pos);
+      attention_mha(layer_idx, pos);
       // feed forward
       feed_forward(input, layer_idx);
     }
@@ -76,21 +76,29 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   return base::error::Success();
 }
 
-std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
-  CHECK(encode_layer_ != nullptr);
-  return encode_layer_->encode(sentence);
+void LLama2Model::create_nonparam_layers() {
+  rope_layer_ = std::make_shared<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
+
+  for (int32_t i = 0; i < layer_num_; ++i) {
+    auto mha_layer = std::make_shared<op::MultiHeadAttention>(
+        device_type_, i, kv_mul_, kv_dim_, seq_len_, head_num_, head_size_);
+    mha_layers_.push_back(mha_layer);
+  }
+
+  add_layer_ = std::make_shared<op::VecAddLayer>(device_type_);
+  swiglu_layer_ = std::make_shared<op::SwiGLULayer>(device_type_, hidden_dim_);
 }
 
-void LLama2Model::create_embedding_layer() {
+void LLama2Model::create_param_layers() {
+  // The embedding layer
   embedding_layer_ = std::make_shared<op::EmbeddingLayer>(device_type_, dim_, seq_len_,
                                                           std::abs(vocab_size_));
 
   const float* weight_embedding = raw_model_data_->weight(0);
   embedding_layer_->set_weight(0, {std::abs(vocab_size_), dim_}, weight_embedding,
                                device_type_);
-}
 
-void LLama2Model::create_matmul_layers() {
+  // create all matmul layer
   int32_t dim = dim_;
   size_t pos = dim * std::abs(vocab_size_) + dim * layer_num_;
   // create weight matrix for query
@@ -169,9 +177,8 @@ void LLama2Model::create_matmul_layers() {
     cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos),
                            device_type_);
   }
-}
 
-void LLama2Model::create_rmsnorm_layers() {
+  // create rmsnorm layer
   size_t rmsnorm_pos = dim_ * std::abs(vocab_size_);
 
   for (int32_t i = 0; i < layer_num_; ++i) {
@@ -210,6 +217,11 @@ void LLama2Model::create_rmsnorm_layers() {
   const float* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
   rms_final_layer->set_weight(0, {dim_}, weight_rmsnorm_final, device_type_);
   rmsnorm_layers_.push_back(rms_final_layer);
+}
+
+std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
+  CHECK(encode_layer_ != nullptr);
+  return encode_layer_->encode(sentence);
 }
 
 void LLama2Model::init_mem() {
@@ -297,36 +309,19 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
   return {key, val};
 }
 
-void LLama2Model::create_rope_layer() {
-  rope_layer_ = std::make_shared<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
-}
-
-void LLama2Model::create_mha_layers() {
-  for (int32_t i = 0; i < layer_num_; ++i) {
-    auto mha_layer = std::make_shared<op::MultiHeadAttention>(
-        device_type_, i, kv_mul_, kv_dim_, seq_len_, head_num_, head_size_);
-    mha_layers_.push_back(mha_layer);
-  }
-}
-
-void LLama2Model::create_add_layer() {
-  add_layer_ = std::make_shared<op::VecAddLayer>(device_type_);
-}
-
 base::Status LLama2Model::create_layers() {
   using namespace base;
+  create_param_layers();
+  create_nonparam_layers();
 
-  create_embedding_layer();
   if (!embedding_layer_) {
     return error::InternalError("Create the embedding layer for the llama model failed!");
   }
 
-  create_rmsnorm_layers();
   if (rmsnorm_layers_.size() != 2 * layer_num_ + 1) {
     return error::InternalError("Create the rmsnorm layers for the llama model failed!");
   }
 
-  create_matmul_layers();
   if (wq_layers_.size() != layer_num_ || wk_layers_.size() != layer_num_ ||
       wv_layers_.size() != layer_num_ || wo_layers_.size() != layer_num_) {
     return error::InternalError(
@@ -360,17 +355,14 @@ base::Status LLama2Model::create_layers() {
     }
   }
 
-  create_rope_layer();
   if (!rope_layer_) {
     return error::InternalError("Create the rope layer for the llama model failed!");
   }
 
-  create_add_layer();
   if (!add_layer_) {
     return error::InternalError("Create the add layer for the llama model failed!");
   }
 
-  create_mha_layers();
   if (mha_layers_.size() != layer_num_) {
     return error::InternalError("Create the mha layer for the llama model failed!");
   }
@@ -380,15 +372,10 @@ base::Status LLama2Model::create_layers() {
     }
   }
 
-  create_swiglu_layer();
   if (!swiglu_layer_) {
     return error::InternalError("Create the SwiGLU layer for the llama model failed!");
   }
   return error::Success();
-}
-
-void LLama2Model::create_swiglu_layer() {
-  swiglu_layer_ = std::make_shared<op::SwiGLULayer>(device_type_, hidden_dim_);
 }
 
 EmbeddingOutput LLama2Model::prepare_input(const std::vector<int>& tokens) {
@@ -479,7 +466,7 @@ void LLama2Model::attention_qkv(int32_t layer_idx, int32_t pos,
   STATUS_CHECK(rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
 }
 
-void LLama2Model::attention_mha_o(int32_t layer_idx, int32_t pos) {
+void LLama2Model::attention_mha(int32_t layer_idx, int32_t pos) {
   // mha
   tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
   tensor::Tensor val_cache = get_buffer(ModelBufferType::kValueCache);

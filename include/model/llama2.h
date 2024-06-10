@@ -32,21 +32,11 @@ class LLama2Model : public Model {
 
   base::Status create_layers() override;
 
-  void create_rope_layer();
+  void create_param_layers();
 
-  void create_add_layer();
+  void create_nonparam_layers();
 
-  void create_mha_layers();
-
-  void create_rmsnorm_layers();
-
-  void create_embedding_layer();
-
-  void create_matmul_layers();
-
-  void create_swiglu_layer();
-
-  void attention_mha_o(int32_t layer_idx, int32_t pos);
+  void attention_mha(int32_t layer_idx, int32_t pos);
 
   EmbeddingOutput prepare_input(const std::vector<int>& tokens);
 
