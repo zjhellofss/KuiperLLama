@@ -46,14 +46,14 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     fill_input(pos, next, tokens, input, embedding_output);
 
     for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
-      attn_rmsnorm(input, layer_idx);
+      attn_rmsnorm(layer_idx, input);
 
       // attention (wq wk wv @ input)
       attention_qkv(layer_idx, pos, pos_tensor);
       // multi-head attention
       attention_mha(layer_idx, pos);
       // feed forward
-      feed_forward(input, layer_idx);
+      feed_forward(layer_idx, input);
     }
 
     cls_logits(input);
@@ -425,7 +425,7 @@ void LLama2Model::fill_input(int32_t pos, int32_t next,
   input.set_device_type(device_type_);
 }
 
-void LLama2Model::attn_rmsnorm(const tensor::Tensor& input, int32_t layer_idx) {
+void LLama2Model::attn_rmsnorm(int32_t layer_idx, const tensor::Tensor& input) {
   // attn rmsnorm
   tensor::Tensor rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
   std::shared_ptr<op::Layer> rmsnorm_layer = rmsnorm_layers_.at(layer_idx);
@@ -489,7 +489,7 @@ void LLama2Model::attention_mha(int32_t layer_idx, int32_t pos) {
   STATUS_CHECK(wo_layer->forward_i1o1(mha_output, attn_output));
 }
 
-void LLama2Model::feed_forward(const tensor::Tensor& input, int32_t layer_idx) {
+void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) {
   // residual add
   CHECK_NE(add_layer_, nullptr)
       << "The add layer in the feedforward block is null pointer";

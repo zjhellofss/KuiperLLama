@@ -40,9 +40,9 @@ class LLama2Model : public Model {
 
   EmbeddingOutput prepare_input(const std::vector<int>& tokens);
 
-  void attn_rmsnorm(const tensor::Tensor& input, int32_t layer_idx);
+  void attn_rmsnorm(int32_t layer_idx, const tensor::Tensor& input);
 
-  void feed_forward(const tensor::Tensor& input, int32_t layer_idx);
+  void feed_forward(int32_t layer_idx, const tensor::Tensor& input);
 
   void fill_input(int32_t pos, int32_t next, const std::vector<int32_t>& tokens,
                   tensor::Tensor& input, const EmbeddingOutput& embedding_output);
