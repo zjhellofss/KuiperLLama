@@ -48,12 +48,12 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
       // kv cache
       tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
-      const auto& [key, val] = slice_kv_cache(layer_idx, pos);
 
       // attention (wq wk wv @ input)
       attention_qkv(layer_idx, pos, pos_tensor);
       attention_mha_o(layer_idx, pos);
 
+      //feed forward
       feed_forward(input, layer_idx);
     }
 
