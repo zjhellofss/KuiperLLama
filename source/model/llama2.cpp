@@ -29,6 +29,9 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
 }
 
 base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_steps) {
+  if (tokens.empty()) {
+    return base::error::InvalidArgument("The token array is empty.");
+  }
   CHECK(device_type_ == base::DeviceType::kDeviceCPU);
   const auto& embedding_output = prepare_input(tokens);
 
@@ -45,13 +48,10 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
       attn_rmsnorm(input, layer_idx);
 
-      // kv cache
-      tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
-
       // attention (wq wk wv @ input)
       attention_qkv(layer_idx, pos, pos_tensor);
+      // multi-head attention
       attention_mha_o(layer_idx, pos);
-
       // feed forward
       feed_forward(input, layer_idx);
     }
@@ -66,16 +66,13 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
           sampler_->sample(forward_logits, static_cast<int32_t>(forward_output.size()));
     }
     std::string output_str = this->encode_layer_->decode(next);
-    if (output_str == "P" || output_str == " " || next == 0x01) {
-      int a = 3;
-    }
     std::cout << output_str << " " << std::flush;
     if (next == eos) {
       break;
     }
     pos += 1;
   }
-  LOG(INFO) << "word(pos) number: " << pos;
+  LOG(INFO) << "The word decode count: " << pos;
   return base::error::Success();
 }
 
