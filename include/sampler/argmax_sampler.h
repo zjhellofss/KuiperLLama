@@ -4,12 +4,11 @@
 
 #ifndef LLAMA_INFER_NON_SAMPLER_H
 #define LLAMA_INFER_NON_SAMPLER_H
-#include <cstddef>
-#include <cstdint>
+#include "sampler.h"
 namespace sampler {
-class ArgmaxSampler {
+class ArgmaxSampler : public Sampler {
  public:
-  int32_t sample(const float* logits, size_t size);
+  int32_t sample(const float* logits, size_t size) override;
 };
 }  // namespace sampler
 #endif  // LLAMA_INFER_NON_SAMPLER_H

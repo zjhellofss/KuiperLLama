@@ -59,6 +59,8 @@ class LLama2Model : public Model {
 
   void attention_qkv(int32_t layer_idx, int32_t pos, const tensor::Tensor& pos_tensor);
 
+  void cls_logits(const tensor::Tensor& input);
+
  private:
   std::shared_ptr<op::VecAddLayer> add_layer_;
   std::shared_ptr<op::RoPELayer> rope_layer_;

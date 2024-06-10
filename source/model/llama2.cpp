@@ -37,7 +37,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   int32_t next = -1;
   int32_t eos = encode_layer_->eos();
   tensor::Tensor pos_tensor = get_buffer(ModelBufferType::kInputPos);
-  TICK(A)
   while (pos < total_steps) {
     // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
@@ -57,15 +56,14 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
       feed_forward(input, layer_idx);
     }
-    STATUS_CHECK(rmsnorm_layers_.at(2 * layer_num_)->forward_i1o1(input, input));
-    tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
-    STATUS_CHECK(cls_layer_->forward_i1o1(input, forward_output));
 
-    const float* forward_logist = forward_output.ptr<float>();
+    cls_logits(input);
+    tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
+    const float* forward_logits = forward_output.ptr<float>();
     if (pos < tokens.size() - 1) {
       next = tokens[pos + 1];
     } else {
-      next = sampler_->sample(forward_logist, forward_output.size());
+      next = sampler_->sample(forward_logits, forward_output.size());
     }
     std::string output_str = this->encode_layer_->decode(next);
     std::cout << output_str << " " << std::flush;
@@ -74,8 +72,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     }
     pos += 1;
   }
-  TOCK(A)
-  std::cout << "word(pos) number: " << pos;
+  LOG(INFO) << "word(pos) number: " << pos;
   return base::error::Success();
 }
 
@@ -455,7 +452,8 @@ EmbeddingOutput LLama2Model::prepare_input(const std::vector<int>& tokens) {
 
   auto input_token_num =
       tensor::Tensor(base::DataType::kDataTypeInt32, static_cast<int32_t>(tokens.size()));
-  LOG_IF(FATAL, !embedding_layer_);
+  LOG_IF(FATAL, !embedding_layer_)
+      << "The embedding layer in the llama2 model is null pointer.";
   STATUS_CHECK(
       embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
 
@@ -477,9 +475,11 @@ void LLama2Model::fill_input(int32_t pos, int32_t next,
     input.assign(input_emb_buffer);
   } else {
     // generate steps
-    CHECK_NE(next, -1);
+    CHECK_NE(next, -1) << "The next token is -1.";
     input_token_num.reshape({1});
     input_tokens.index<int32_t>(0) = next;
+    CHECK_NE(embedding_layer_, nullptr)
+        << "The embedding layer in the llama2 model is null pointer.";
     STATUS_CHECK(
         embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
 
@@ -508,19 +508,26 @@ void LLama2Model::attention_qkv(int32_t layer_idx, int32_t pos,
   const auto& [key, val] = slice_kv_cache(layer_idx, pos);
   // query
   const auto& query_layer = wq_layers_.at(layer_idx);
+  CHECK_NE(query_layer, nullptr)
+      << "The query layer in the attention block is null pointer.";
   STATUS_CHECK(
       query_layer->forward_i1o1(get_buffer(ModelBufferType::kOutputRMSNorm), query));
 
   auto rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
   // key
   const auto& key_layer = wk_layers_.at(layer_idx);
+  CHECK_NE(key_layer, nullptr) << "The key layer in the attention block is null pointer.";
   STATUS_CHECK(key_layer->forward_i1o1(rmsnorm_output, key));
 
   // value
   const auto& value_layer = wv_layers_.at(layer_idx);
+  CHECK_NE(value_layer, nullptr)
+      << "The value layer in the attention block is null pointer.";
   STATUS_CHECK(value_layer->forward_i1o1(rmsnorm_output, val));
 
   // rope
+  CHECK_NE(rope_layer_, nullptr)
+      << "The RoPE layer in the attention block is null pointer.";
   STATUS_CHECK(rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
 }
 
@@ -535,6 +542,7 @@ void LLama2Model::attention_mha_o(int32_t layer_idx, int32_t pos) {
 
   tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
   const auto& mha_layer = mha_layers_.at(layer_idx);
+  CHECK_NE(mha_layer, nullptr) << "The multi head attention layer is null pointer.";
   mha_layer->set_pos(pos);
   STATUS_CHECK(mha_layer->forward_i5o1(query, score_storage, key_cache, val_cache,
                                        key_storage, mha_output));
@@ -542,36 +550,61 @@ void LLama2Model::attention_mha_o(int32_t layer_idx, int32_t pos) {
   // wo @ attention output
   tensor::Tensor attn_output = get_buffer(ModelBufferType::kAttnOutput);
   const auto& wo_layer = wo_layers_.at(layer_idx);
+  CHECK_NE(wo_layer, nullptr) << "The weight output layer is null pointer.";
   STATUS_CHECK(wo_layer->forward_i1o1(mha_output, attn_output));
 }
 
 void LLama2Model::feed_forward(const tensor::Tensor& input, int32_t layer_idx) {
   // residual add
+  CHECK_NE(add_layer_, nullptr)
+      << "The add layer in the feedforward block is null pointer";
   STATUS_CHECK(
       add_layer_->forward_i2o1(input, get_buffer(ModelBufferType::kAttnOutput), input));
 
   // ffn rmsnorm
   tensor::Tensor ffn_norm_output = get_buffer(ModelBufferType::kFFNRMSNorm);
-  STATUS_CHECK(
-      rmsnorm_layers_.at(layer_idx + layer_num_)->forward_i1o1(input, ffn_norm_output));
+  const auto& ffn_rmsnorm = rmsnorm_layers_.at(layer_idx + layer_num_);
+  CHECK_NE(ffn_rmsnorm, nullptr)
+      << "The final rmsnorm layer in the feedforward block is null pointer";
+  STATUS_CHECK(ffn_rmsnorm->forward_i1o1(input, ffn_norm_output));
 
   // w1
   tensor::Tensor w1_output = get_buffer(ModelBufferType::kW1Output);
-  STATUS_CHECK(w1_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w1_output));
+  const auto& w1_layer = w1_layers_.at(layer_idx);
+  CHECK_NE(w1_layer, nullptr) << "The w1 layer in the feedforward block is null pointer";
+  STATUS_CHECK(w1_layer->forward_i1o1(ffn_norm_output, w1_output));
 
   // w3
   tensor::Tensor w3_ouput = get_buffer(ModelBufferType::kW3Output);
-  STATUS_CHECK(w3_layers_.at(layer_idx)->forward_i1o1(ffn_norm_output, w3_ouput));
+  const auto& w3_layer = w3_layers_.at(layer_idx);
+  CHECK_NE(w3_layer, nullptr) << "The w3 layer in the feedforward block is null pointer";
+  STATUS_CHECK(w3_layer->forward_i1o1(ffn_norm_output, w3_ouput));
 
   // SwiGLU
+  CHECK_NE(swiglu_layer_, nullptr)
+      << "The swiglu layer in the feedforward block is null pointer";
   STATUS_CHECK(swiglu_layer_->forward_i2o1(w1_output, w3_ouput, w1_output));
 
   // w2
   tensor::Tensor w2_output = get_buffer(ModelBufferType::kW2Output);
-  STATUS_CHECK(w2_layers_.at(layer_idx)->forward_i1o1(w1_output, w2_output));
+  const auto& w2_layer = w2_layers_.at(layer_idx);
+  CHECK_NE(w2_layer, nullptr) << "The w2 layer in the feedforward block is null pointer";
+  STATUS_CHECK(w2_layer->forward_i1o1(w1_output, w2_output));
 
   // residual add
+  CHECK_NE(add_layer_, nullptr)
+      << "The add layer in the feedforward block is null pointer";
   STATUS_CHECK(add_layer_->forward_i2o1(input, w2_output, input));
+}
+
+void LLama2Model::cls_logits(const tensor::Tensor& input) {
+  const auto& norm = rmsnorm_layers_.at(2 * layer_num_);
+  CHECK_NE(norm, nullptr);
+  STATUS_CHECK(norm->forward_i1o1(input, input));
+
+  tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
+  CHECK_NE(cls_layer_, nullptr);
+  STATUS_CHECK(cls_layer_->forward_i1o1(input, forward_output));
 }
 
 }  // namespace model

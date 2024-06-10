@@ -169,6 +169,7 @@ base::Status Model::create_encode_layer() {
   return error::Success();
 }
 
+
 base::Status Model::gen_model_from_file() {
   using namespace base;
 
