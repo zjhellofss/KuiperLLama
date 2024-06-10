@@ -122,7 +122,7 @@ tensor::Tensor& Layer::get_output(int32_t idx) {
 }
 
 base::Status Layer::check() const {
-  return base::error::Success();
+  return base::error::FunctionNotImplement("The check function is not implement yet");
 }
 
 const tensor::Tensor& Layer::get_output(int32_t idx) const {
@@ -227,7 +227,6 @@ base::Status Layer::forward_i3o1(const tensor::Tensor& input1,
                                  const tensor::Tensor& input2,
                                  const tensor::Tensor& input3,
                                  const tensor::Tensor& output1) {
-
   if (input1.is_empty()) {
     return base::error::InvalidArgument("The input tensor1 is empty.");
   }
@@ -303,7 +302,6 @@ base::Status Layer::forward_i5o1(const tensor::Tensor& input1,
   this->set_input(2, input3);
   this->set_input(3, input4);
   this->set_input(4, input5);
-
 
   if (output1.is_empty()) {
     return base::error::InvalidArgument("The output tensor1 is empty.");
