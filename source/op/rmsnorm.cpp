@@ -3,6 +3,9 @@
 namespace op {
 RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
     : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
+  reset_input_size(1);
+  reset_output_size(1);
+  reset_weight_size(1);
 }
 
 base::Status RmsNormLayer::base_forward() {

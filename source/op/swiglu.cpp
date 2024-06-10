@@ -4,6 +4,8 @@
 namespace op {
 SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)
     : Layer(device_type, op::LayerType::kLayerSwiGLU, "SwiGLU"), hidden_dim_(hidden_dim) {
+  reset_input_size(2);
+  reset_output_size(1);
 }
 
 base::Status SwiGLULayer::check() const {

@@ -1,17 +1,6 @@
 #include "mha_kernel.h"
+#include "softmax_kernel.h"
 namespace kernel {
-
-static void softmax_inplace(const tensor::Tensor& input) {
-  int32_t size = static_cast<int32_t>(input.size());
-  const float* input_ptr = input.ptr<float>();
-
-  float max_value = *std::max(input_ptr, input_ptr + size);
-  arma::fvec input_mat(const_cast<float*>(input_ptr), size, false, true);
-  input_mat = arma::exp(input_mat - max_value);
-
-  float sum_value = arma::sum(input_mat);
-  input_mat = input_mat / sum_value;
-}
 
 void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_len,
                     int32_t kv_dim, int32_t kv_mul, int32_t head_size,
@@ -42,7 +31,7 @@ void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t 
     score_head_buffer->set_device_type(base::DeviceType::kDeviceCPU);
     tensor::Tensor score_head_tensor(base::DataType::kDataTypeFp32, pos + 1);
     score_head_tensor.assign(score_head_buffer);
-    softmax_inplace(score_head_tensor);
+    get_softmax_kernel(base::DeviceType::kDeviceCPU)(score_head_tensor);
 
     arma::fvec output_head(const_cast<float*>(mha_out.ptr<float>()) + h * head_size,
                            head_size, false, true);

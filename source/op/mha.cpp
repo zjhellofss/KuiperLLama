@@ -11,6 +11,8 @@ MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t lay
       seq_len_(seq_len),
       head_num_(head_num),
       head_size_(head_size) {
+  reset_input_size(5);
+  reset_output_size(1);
 }
 
 base::Status MultiHeadAttention::base_forward() {

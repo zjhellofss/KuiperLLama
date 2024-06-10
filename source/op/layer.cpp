@@ -166,7 +166,7 @@ const tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) const {
 }
 
 void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
-                                const float* weight_ptr) {
+                                const float* weight_ptr, base::DeviceType device_type) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
 
@@ -174,6 +174,9 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
       std::accumulate(dims.begin(), dims.end(), sizeof(float), std::multiplies<>());
   std::shared_ptr<base::Buffer> buffer =
       std::make_shared<base::Buffer>(size, nullptr, (void*)(weight_ptr), true);
+  if (device_type != base::DeviceType::kDeviceUnknown) {
+    buffer->set_device_type(device_type);
+  }
 
   tensor::Tensor weight(base::DataType::kDataTypeFp32, dims);
   CHECK(weight.assign(buffer));

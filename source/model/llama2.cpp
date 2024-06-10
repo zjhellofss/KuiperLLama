@@ -1,11 +1,10 @@
 #include "model/llama2.h"
-#include <fcntl.h>
 #include <glog/logging.h>
 #include <sentencepiece_processor.h>
-#include <sys/mman.h>
 #include <array>
 #include <utility>
 #include "base/tick.h"
+#include "sampler/mult_sampler.h"
 namespace model {
 
 LLama2Model::LLama2Model(std::string token_path, std::string model_path)
@@ -53,7 +52,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
       attention_qkv(layer_idx, pos, pos_tensor);
       attention_mha_o(layer_idx, pos);
 
-      //feed forward
+      // feed forward
       feed_forward(input, layer_idx);
     }
 
@@ -63,9 +62,13 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     if (pos < tokens.size() - 1) {
       next = tokens[pos + 1];
     } else {
-      next = sampler_->sample(forward_logits, forward_output.size());
+      next =
+          sampler_->sample(forward_logits, static_cast<int32_t>(forward_output.size()));
     }
     std::string output_str = this->encode_layer_->decode(next);
+    if (output_str == "P" || output_str == " " || next == 0x01) {
+      int a = 3;
+    }
     std::cout << output_str << " " << std::flush;
     if (next == eos) {
       break;
@@ -86,11 +89,8 @@ void LLama2Model::create_embedding_layer() {
                                                           std::abs(vocab_size_));
 
   const float* weight_embedding = raw_model_data_->weight(0);
-  embedding_layer_->reset_weight_size(1);
-  embedding_layer_->reset_input_size(2);
-  embedding_layer_->reset_output_size(1);
-  embedding_layer_->set_weight(0, {std::abs(vocab_size_), dim_}, weight_embedding);
-  embedding_layer_->get_weight(0).set_device_type(device_type_);
+  embedding_layer_->set_weight(0, {std::abs(vocab_size_), dim_}, weight_embedding,
+                               device_type_);
 }
 
 void LLama2Model::create_matmul_layers() {
@@ -99,11 +99,7 @@ void LLama2Model::create_matmul_layers() {
   // create weight matrix for query
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wq = std::make_shared<op::MatmulLayer>(device_type_, dim, dim);
-    wq->reset_input_size(1);
-    wq->reset_output_size(1);
-    wq->reset_weight_size(1);
-    wq->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos));
-    wq->get_weight(0).set_device_type(device_type_);
+    wq->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), device_type_);
     pos += dim * dim;
     wq_layers_.push_back(wq);
   }
@@ -111,12 +107,7 @@ void LLama2Model::create_matmul_layers() {
   // create weight matrix for key
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wk = std::make_shared<op::MatmulLayer>(device_type_, kv_dim_, dim);
-    wk->reset_input_size(1);
-    wk->reset_output_size(1);
-    wk->reset_weight_size(1);
-
-    wk->set_weight(0, {kv_dim_, dim}, this->raw_model_data_->weight(pos));
-    wk->get_weight(0).set_device_type(device_type_);
+    wk->set_weight(0, {kv_dim_, dim}, this->raw_model_data_->weight(pos), device_type_);
     wk_layers_.push_back(wk);
     pos += kv_dim_ * dim;
   }
@@ -124,11 +115,7 @@ void LLama2Model::create_matmul_layers() {
   // create weight matrix for value
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wv = std::make_shared<op::MatmulLayer>(device_type_, kv_dim_, dim);
-    wv->reset_input_size(1);
-    wv->reset_output_size(1);
-    wv->reset_weight_size(1);
-    wv->set_weight(0, {kv_dim_, dim}, this->raw_model_data_->weight(pos));
-    wv->get_weight(0).set_device_type(device_type_);
+    wv->set_weight(0, {kv_dim_, dim}, this->raw_model_data_->weight(pos), device_type_);
     wv_layers_.push_back(wv);
     pos += kv_dim_ * dim;
   }
@@ -136,11 +123,7 @@ void LLama2Model::create_matmul_layers() {
   // create weight matrix for output
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto wo = std::make_shared<op::MatmulLayer>(device_type_, dim, dim);
-    wo->reset_input_size(1);
-    wo->reset_output_size(1);
-    wo->reset_weight_size(1);
-    wo->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos));
-    wo->get_weight(0).set_device_type(device_type_);
+    wo->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), device_type_);
     wo_layers_.push_back(wo);
     pos += dim * dim;
   }
@@ -152,11 +135,8 @@ void LLama2Model::create_matmul_layers() {
   int32_t hidden_dim = hidden_dim_;
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto w1 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim);
-    w1->reset_input_size(1);
-    w1->reset_output_size(1);
-    w1->reset_weight_size(1);
-    w1->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos));
-    w1->get_weight(0).set_device_type(device_type_);
+    w1->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos),
+                   device_type_);
     w1_layers_.push_back(w1);
     pos += dim * hidden_dim;
   }
@@ -164,11 +144,8 @@ void LLama2Model::create_matmul_layers() {
   // w2 layers
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto w2 = std::make_shared<op::MatmulLayer>(device_type_, dim, hidden_dim);
-    w2->reset_input_size(1);
-    w2->reset_output_size(1);
-    w2->reset_weight_size(1);
-    w2->set_weight(0, {dim, hidden_dim}, this->raw_model_data_->weight(pos));
-    w2->get_weight(0).set_device_type(device_type_);
+    w2->set_weight(0, {dim, hidden_dim}, this->raw_model_data_->weight(pos),
+                   device_type_);
     w2_layers_.push_back(w2);
     pos += dim * hidden_dim;
   }
@@ -176,11 +153,8 @@ void LLama2Model::create_matmul_layers() {
   // w3 layers
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto w3 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim);
-    w3->reset_input_size(1);
-    w3->reset_output_size(1);
-    w3->reset_weight_size(1);
-    w3->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos));
-    w3->get_weight(0).set_device_type(device_type_);
+    w3->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos),
+                   device_type_);
     w3_layers_.push_back(w3);
     pos += dim * hidden_dim;
   }
@@ -190,16 +164,14 @@ void LLama2Model::create_matmul_layers() {
   pos += seq_len_ * head_size_;
 
   cls_layer_ = std::make_shared<op::MatmulLayer>(device_type_, vocab_size_, dim);
-  cls_layer_->reset_input_size(1);
-  cls_layer_->reset_output_size(1);
-  cls_layer_->reset_weight_size(1);
   if (is_shared_weight_) {
     // using token embedding weight
-    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(0));
+    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(0),
+                           device_type_);
   } else {
-    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos));
+    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos),
+                           device_type_);
   }
-  cls_layer_->get_weight(0).set_device_type(device_type_);
 }
 
 void LLama2Model::create_rmsnorm_layers() {
@@ -208,13 +180,9 @@ void LLama2Model::create_rmsnorm_layers() {
   for (int32_t i = 0; i < layer_num_; ++i) {
     std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
         std::make_shared<op::RmsNormLayer>(device_type_, dim_);
-    rms_norm_layer->reset_input_size(1);
-    rms_norm_layer->reset_output_size(1);
-    rms_norm_layer->reset_weight_size(1);
 
     const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
-    rms_norm_layer->set_weight(0, {dim_}, weight_rmsnorm);
-    rms_norm_layer->get_weight(0).set_device_type(device_type_);
+    rms_norm_layer->set_weight(0, {dim_}, weight_rmsnorm, device_type_);
     rmsnorm_layers_.push_back(rms_norm_layer);
 
     rmsnorm_pos += dim_;
@@ -228,13 +196,8 @@ void LLama2Model::create_rmsnorm_layers() {
   for (int32_t i = 0; i < layer_num_; ++i) {
     std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
         std::make_shared<op::RmsNormLayer>(device_type_, dim_);
-    rms_norm_layer->reset_input_size(1);
-    rms_norm_layer->reset_output_size(1);
-    rms_norm_layer->reset_weight_size(1);
-
     const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
-    rms_norm_layer->set_weight(0, {dim_}, weight_rmsnorm);
-    rms_norm_layer->get_weight(0).set_device_type(device_type_);
+    rms_norm_layer->set_weight(0, {dim_}, weight_rmsnorm, device_type_);
     rmsnorm_layers_.push_back(rms_norm_layer);
 
     rmsnorm_pos += dim_;
@@ -246,13 +209,9 @@ void LLama2Model::create_rmsnorm_layers() {
 
   std::shared_ptr<op::RmsNormLayer> rms_final_layer =
       std::make_shared<op::RmsNormLayer>(device_type_, dim_);
-  rms_final_layer->reset_input_size(1);
-  rms_final_layer->reset_output_size(1);
-  rms_final_layer->reset_weight_size(1);
 
   const float* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
-  rms_final_layer->set_weight(0, {dim_}, weight_rmsnorm_final);
-  rms_final_layer->get_weight(0).set_device_type(device_type_);
+  rms_final_layer->set_weight(0, {dim_}, weight_rmsnorm_final, device_type_);
   rmsnorm_layers_.push_back(rms_final_layer);
 }
 
@@ -343,24 +302,18 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
 
 void LLama2Model::create_rope_layer() {
   rope_layer_ = std::make_shared<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
-  rope_layer_->reset_input_size(3);
-  rope_layer_->reset_output_size(1);
 }
 
 void LLama2Model::create_mha_layers() {
   for (int32_t i = 0; i < layer_num_; ++i) {
     auto mha_layer = std::make_shared<op::MultiHeadAttention>(
         device_type_, i, kv_mul_, kv_dim_, seq_len_, head_num_, head_size_);
-    mha_layer->reset_input_size(5);
-    mha_layer->reset_output_size(1);
     mha_layers_.push_back(mha_layer);
   }
 }
 
 void LLama2Model::create_add_layer() {
   add_layer_ = std::make_shared<op::VecAddLayer>(device_type_);
-  add_layer_->reset_input_size(2);
-  add_layer_->reset_output_size(1);
 }
 
 base::Status LLama2Model::create_layers() {
@@ -439,8 +392,6 @@ base::Status LLama2Model::create_layers() {
 
 void LLama2Model::create_swiglu_layer() {
   swiglu_layer_ = std::make_shared<op::SwiGLULayer>(device_type_, hidden_dim_);
-  swiglu_layer_->reset_input_size(2);
-  swiglu_layer_->reset_output_size(1);
 }
 
 EmbeddingOutput LLama2Model::prepare_input(const std::vector<int>& tokens) {

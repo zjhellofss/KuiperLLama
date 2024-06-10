@@ -8,7 +8,7 @@
 namespace sampler {
 class ArgmaxSampler : public Sampler {
  public:
-  int32_t sample(const float* logits, size_t size) override;
+  int32_t sample(const float* logits, int32_t size) override;
 };
 }  // namespace sampler
 #endif  // LLAMA_INFER_NON_SAMPLER_H

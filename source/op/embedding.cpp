@@ -8,6 +8,9 @@ EmbeddingLayer::EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_
       seq_len_(seq_len),
       vocab_size_(vocab_size),
       LayerFp32Param(device_type, LayerType::kLayerEmbedding, "Embedding") {
+  reset_weight_size(1);
+  reset_input_size(2);
+  reset_output_size(1);
 }
 
 base::Status EmbeddingLayer::check() const {

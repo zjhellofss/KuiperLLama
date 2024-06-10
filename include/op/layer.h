@@ -77,10 +77,6 @@ class BaseLayer {
 
   virtual const tensor::Tensor& get_output(int32_t idx) const = 0;
 
-  virtual void reset_input_size(size_t size) = 0;
-
-  virtual void reset_output_size(size_t size) = 0;
-
   const std::string& get_layer_name() const;
 
   void set_layer_name(const std::string& layer_name);
@@ -149,9 +145,9 @@ class Layer : public BaseLayer {
 
   size_t output_size() const override;
 
-  void reset_input_size(size_t size) override;
+  void reset_input_size(size_t size);
 
-  void reset_output_size(size_t size) override;
+  void reset_output_size(size_t size);
 
  private:
   std::vector<tensor::Tensor> inputs_;
@@ -173,7 +169,8 @@ class LayerFp32Param : public Layer {
 
   void set_weight(int32_t idx, const tensor::Tensor& weight);
 
-  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr);
+  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr,
+                  base::DeviceType device_type = base::DeviceType::kDeviceUnknown);
 
  private:
   std::vector<tensor::Tensor> weights_;

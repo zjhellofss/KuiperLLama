@@ -5,6 +5,9 @@ MatmulLayer::MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim
     : LayerFp32Param(device_type, LayerType::kLayerMatmul, "Matmul"),
       dim0_(dim0),
       dim1_(dim1) {
+  reset_input_size(1);
+  reset_output_size(1);
+  reset_weight_size(1);
 }
 
 base::Status MatmulLayer::check() const {

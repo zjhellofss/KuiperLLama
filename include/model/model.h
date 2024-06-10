@@ -109,7 +109,7 @@ class Model {
   std::string model_path_;
   std::unique_ptr<op::EncodeLayer> encode_layer_;
   std::map<ModelBufferType, tensor::Tensor> buffers_;
-  std::unique_ptr<sampler::ArgmaxSampler> sampler_;
+  std::unique_ptr<sampler::Sampler> sampler_;
   std::shared_ptr<RawModelData> raw_model_data_;
   base::DeviceType device_type_ = base::DeviceType::kDeviceUnknown;
   base::ModelType model_type_ = base::ModelType::kModelTypeUnknown;
