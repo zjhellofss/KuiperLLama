@@ -49,7 +49,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
       attn_rmsnorm(layer_idx, input);
 
       // attention (wq wk wv @ input)
-      attention_qkv(layer_idx, pos, pos_tensor);
+      attention_qkv(layer_idx, pos_tensor);
       // multi-head attention
       attention_mha(layer_idx, pos);
       // feed forward
@@ -228,62 +228,53 @@ void LLama2Model::init_mem() {
   auto alloc = base::CPUDeviceAllocatorFactory::get_instance();
   int32_t max_seq_len = seq_len_;
   tensor::Tensor input_tokens(base::DataType::kDataTypeInt32,
-                              static_cast<int32_t>(max_seq_len));
-  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len, dim_);
+                              static_cast<int32_t>(max_seq_len), true, alloc);
+  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len, dim_, true,
+                                  alloc);
 
-  input_tokens.allocate(alloc);
-  input_embeddings.allocate(alloc);
   CHECK(insert_buffer(ModelBufferType::kInputTokens, input_tokens));
   CHECK(insert_buffer(ModelBufferType::kInputEmbeddings, input_embeddings));
 
-  tensor::Tensor rms_output(base::DataType::kDataTypeFp32, dim_);
-  rms_output.allocate(alloc);
+  tensor::Tensor rms_output(base::DataType::kDataTypeFp32, dim_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kOutputRMSNorm, rms_output));
   CHECK(insert_buffer(ModelBufferType::kOutputMHA, rms_output));
   CHECK(insert_buffer(ModelBufferType::kW2Output, rms_output));
   CHECK(insert_buffer(ModelBufferType::kFFNRMSNorm, rms_output));
 
-  tensor::Tensor score_storage(base::DataType::kDataTypeFp32, head_size_, seq_len_);
-  score_storage.allocate(alloc);
+  tensor::Tensor score_storage(base::DataType::kDataTypeFp32, head_size_, seq_len_, true,
+                               alloc);
   CHECK(insert_buffer(ModelBufferType::kKeyStorage, score_storage));
 
-  tensor::Tensor w1_output(base::DataType::kDataTypeFp32, hidden_dim_);
-  w1_output.allocate(alloc);
-  tensor::Tensor w3_output(base::DataType::kDataTypeFp32, hidden_dim_);
-  w3_output.allocate(alloc);
+  tensor::Tensor w1_output(base::DataType::kDataTypeFp32, hidden_dim_, true, alloc);
+  tensor::Tensor w3_output(base::DataType::kDataTypeFp32, hidden_dim_, true, alloc);
 
   CHECK(insert_buffer(ModelBufferType::kW1Output, w1_output));
   CHECK(insert_buffer(ModelBufferType::kW3Output, w3_output));
 
   // kv cache
-  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_);
-  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_,
-                             kv_dim_);
+  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_,
+                           true, alloc);
+  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_,
+                             true, alloc);
 
-  key_cache.allocate(alloc);
-  value_cache.allocate(alloc);
   CHECK(insert_buffer(ModelBufferType::kKeyCache, key_cache));
   CHECK(insert_buffer(ModelBufferType::kValueCache, value_cache));
 
   // Wq query output
-  tensor::Tensor query(base::DataType::kDataTypeFp32, dim_);
-  query.allocate(alloc);
+  tensor::Tensor query(base::DataType::kDataTypeFp32, dim_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kQuery, query));
 
   // Pos tensor
-  tensor::Tensor pos_tensor(base::DataType::kDataTypeInt32, 1);
-  pos_tensor.allocate(alloc);
+  tensor::Tensor pos_tensor(base::DataType::kDataTypeInt32, 1, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kInputPos, pos_tensor));
 
   // Attention output
-  tensor::Tensor attn(base::DataType::kDataTypeFp32, head_num_, seq_len_);
-  attn.allocate(alloc);
+  tensor::Tensor attn(base::DataType::kDataTypeFp32, head_num_, seq_len_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kScoreStorage, attn));
   CHECK(insert_buffer(ModelBufferType::kAttnOutput, query));
 
   // final forward output
-  tensor::Tensor forward_output(base::DataType::kDataTypeFp32, vocab_size_);
-  forward_output.allocate(alloc);
+  tensor::Tensor forward_output(base::DataType::kDataTypeFp32, vocab_size_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
 }
 
@@ -435,10 +426,10 @@ void LLama2Model::attn_rmsnorm(int32_t layer_idx, const tensor::Tensor& input) {
   STATUS_CHECK(rmsnorm_layer->forward_i1o1(input, rmsnorm_output));
 }
 
-void LLama2Model::attention_qkv(int32_t layer_idx, int32_t pos,
-                                const tensor::Tensor& pos_tensor) {
+void LLama2Model::attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor) {
   // kv cache
   tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
+  int32_t pos = pos_tensor.index<int32_t>(0);
   // wq wk wv @ input
   const auto& [key, val] = slice_kv_cache(layer_idx, pos);
   // query

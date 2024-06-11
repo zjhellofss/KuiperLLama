@@ -47,7 +47,7 @@ class LLama2Model : public Model {
   void fill_input(int32_t pos, int32_t next, const std::vector<int32_t>& tokens,
                   tensor::Tensor& input, const EmbeddingOutput& embedding_output);
 
-  void attention_qkv(int32_t layer_idx, int32_t pos, const tensor::Tensor& pos_tensor);
+  void attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor);
 
   void cls_logits(const tensor::Tensor& input);
 

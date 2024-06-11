@@ -15,14 +15,17 @@ class Tensor {
   explicit Tensor(base::DataType data_type, int32_t dim0, bool need_alloc = false,
                   std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
-  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_alloc = false,
+  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1,
+                  bool need_alloc = false,
                   std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
   explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2,
-                  bool need_alloc = false, std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
+                  bool need_alloc = false,
+                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
-  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2, int32_t dim3,
-                  bool need_alloc = false, std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
+  explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2,
+                  int32_t dim3, bool need_alloc = false,
+                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr);
 
   explicit Tensor(base::DataType data_type, std::vector<int32_t> dims);
 
@@ -58,7 +61,8 @@ class Tensor {
 
   base::DeviceType device_type() const;
 
-  bool allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool need_realloc = false);
+  bool allocate(std::shared_ptr<base::DeviceAllocator> allocator,
+                bool need_realloc = false);
 
   template <typename T>
   T* ptr(int64_t index);
@@ -68,6 +72,9 @@ class Tensor {
 
   template <typename T>
   T& index(int64_t offset);
+
+  template <typename T>
+  const T& index(int64_t offset) const;
 
   template <typename T>
   void transpose_dim12(Tensor dst);
@@ -82,6 +89,12 @@ class Tensor {
 template <typename T>
 T& Tensor::index(int64_t offset) {
   T& val = *(reinterpret_cast<T*>(buffer_->ptr()) + offset);
+  return val;
+}
+
+template <typename T>
+const T& Tensor::index(int64_t offset) const {
+  const T& val = *(reinterpret_cast<T*>(buffer_->ptr()) + offset);
   return val;
 }
 
