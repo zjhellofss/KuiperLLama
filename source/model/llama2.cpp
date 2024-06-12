@@ -313,16 +313,6 @@ std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t la
   return {key, val};
 }
 
-base::Status LLama2Model::link_layers() {
-  for (int32_t i = 0; i < config_->layer_num_; ++i) {
-    std::shared_ptr<op::Layer> attn_rmsnorm = llama_layers_->rmsnorm_layers_.at(i);
-    std::shared_ptr<op::Layer> query_layer = llama_layers_->wq_layers_.at(i);
-    std::shared_ptr<op::Layer> key_layer = llama_layers_->wq_layers_.at(i);
-    std::shared_ptr<op::Layer> value_layer = llama_layers_->wv_layers_.at(i);
-  }
-  return base::Status();
-}
-
 base::Status LLama2Model::create_layers() {
   using namespace base;
   if (!llama_layers_) {

@@ -250,15 +250,6 @@ base::Status Layer::forward_i5o1(const tensor::Tensor& input1,
   return this->base_forward();
 }
 
-void Layer::set_input_layer(std::shared_ptr<op::Layer> input_layer) {
-  CHECK_NE(input_layer, nullptr);
-  this->input_layers_.push_back(input_layer);
-}
-
-void Layer::set_output_layer(std::shared_ptr<op::Layer> output_layer) {
-  CHECK_NE(output_layer, nullptr);
-  this->output_layers_.push_back(output_layer);
-}
 tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());

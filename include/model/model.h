@@ -85,8 +85,6 @@ class Model {
  private:
   virtual void init_mem() = 0;
 
-  virtual base::Status link_layers() = 0;
-
   virtual base::Status create_layers() = 0;
 
   virtual std::vector<int32_t> encode(const std::string& sentence) = 0;

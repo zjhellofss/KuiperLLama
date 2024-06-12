@@ -52,8 +52,6 @@ class LLama2Model : public Model {
 
   base::Status create_layers() override;
 
-  base::Status link_layers() override;
-
   void create_param_layers() override;
 
   void create_nonparam_layers() override;
