@@ -42,10 +42,10 @@ class LLama2Model : public Model {
 
   base::Status forward(const std::vector<int>& tokens, int32_t total_steps) override;
 
-  std::vector<int32_t> encode(const std::string& sentence) override;
+  std::vector<int32_t> encode(const std::string& sentence) const override;
 
-  std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
-                                                           int32_t token_pos) override;
+  std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(
+      int32_t layer_idx, int32_t token_pos) const override;
 
  private:
   void init_mem() override;
@@ -56,20 +56,24 @@ class LLama2Model : public Model {
 
   void create_nonparam_layers() override;
 
-  void attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor);
+  void attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
-  EmbeddingOutput embedding(const std::vector<int>& tokens);
+  EmbeddingOutput embedding(const std::vector<int>& tokens) const;
 
-  void attention_rms(int32_t layer_idx, const tensor::Tensor& input);
+  void attention_rms(int32_t layer_idx, const tensor::Tensor& input) const;
 
-  void feed_forward(int32_t layer_idx, const tensor::Tensor& input);
+  void feed_forward(int32_t layer_idx, const tensor::Tensor& input) const;
 
-  void fill_input(int32_t pos, int32_t next, const std::vector<int32_t>& tokens,
-                  tensor::Tensor& input, const EmbeddingOutput& embedding_output);
+  void fill_input(int32_t next, const tensor::Tensor& pos_tensor,
+                  const std::vector<int32_t>& tokens, tensor::Tensor& input,
+                  const EmbeddingOutput& embedding_output) const;
 
-  void attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor);
+  void attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
-  void cls_logits(const tensor::Tensor& input);
+  void cls_logits(const tensor::Tensor& input) const;
+
+  std::string post_processing(int32_t pos, int32_t& next,
+                              const std::vector<int32_t>& tokens) const override;
 
  private:
   std::unique_ptr<LLama2Layers> llama_layers_;

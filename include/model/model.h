@@ -80,17 +80,20 @@ class Model {
 
   virtual base::Status gen_model_from_file();
 
-  virtual base::Status generate_model_infos(const ModelConfig& config);
+  virtual base::Status generate_model_infos(const ModelConfig& config) const;
+
+  virtual std::string post_processing(int32_t pos, int32_t& next,
+                                      const std::vector<int32_t>& tokens) const = 0;
 
  private:
   virtual void init_mem() = 0;
 
   virtual base::Status create_layers() = 0;
 
-  virtual std::vector<int32_t> encode(const std::string& sentence) = 0;
+  virtual std::vector<int32_t> encode(const std::string& sentence) const = 0;
 
-  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
-                                                                   int32_t token_pos) = 0;
+  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(
+      int32_t layer_idx, int32_t token_pos) const = 0;
 
   virtual void create_param_layers() = 0;
 
@@ -102,7 +105,6 @@ class Model {
   std::string token_path_;
   std::string model_path_;
   std::unique_ptr<op::EncodeLayer> encode_layer_;
-  std::shared_ptr<std::shared_ptr<op::Layer>> sorted_layers_;
   std::map<ModelBufferType, tensor::Tensor> buffers_;
   std::unique_ptr<sampler::Sampler> sampler_;
   std::shared_ptr<RawModelData> raw_model_data_;

@@ -121,7 +121,7 @@ base::Status Model::read_model_file() {
   return error::Success();
 }
 
-base::Status Model::generate_model_infos(const ModelConfig& config) {
+base::Status Model::generate_model_infos(const ModelConfig& config) const {
   config_->dim_ = config.dim;
   config_->hidden_dim_ = config.hidden_dim;
   config_->layer_num_ = config.layer_num;

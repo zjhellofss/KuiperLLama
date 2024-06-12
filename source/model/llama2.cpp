@@ -43,7 +43,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
     tensor::Tensor input(base::DataType::kDataTypeFp32, config_->dim_);
-    fill_input(pos, next, tokens, input, embedding_output);
+    fill_input(next, pos_tensor, tokens, input, embedding_output);
 
     for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
       attention_rms(layer_idx, input);
@@ -57,16 +57,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     }
 
     cls_logits(input);
-    tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
-    const float* forward_logits = forward_output.ptr<float>();
-    if (pos < tokens.size() - 1) {
-      next = tokens[pos + 1];
-    } else {
-      next =
-          sampler_->sample(forward_logits, static_cast<int32_t>(forward_output.size()));
-    }
-    std::string output_str = this->encode_layer_->decode(next);
-    std::cout << output_str << " " << std::flush;
+    std::string decode_str = post_processing(pos, next, tokens);
+    std::cout << decode_str << " " << std::flush;
     if (next == eos) {
       break;
     }
@@ -227,7 +219,7 @@ void LLama2Model::create_param_layers() {
   llama_layers_->rmsnorm_layers_.push_back(rms_final_layer);
 }
 
-std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
+std::vector<int32_t> LLama2Model::encode(const std::string& sentence) const {
   CHECK(encode_layer_ != nullptr);
   return encode_layer_->encode(sentence);
 }
@@ -290,15 +282,16 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
 }
 
-std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
-                                                                      int32_t token_pos) {
+std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(
+    int32_t layer_idx, int32_t token_pos) const {
   int32_t layer_offset = layer_idx * config_->seq_len_ * config_->kv_dim_;
   int32_t cache_offset =
       static_cast<int32_t>(layer_offset + token_pos * config_->kv_dim_);
 
-  float* key_cache_ptr = get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset);
-  float* val_cache_ptr =
-      get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset);
+  float* key_cache_ptr =
+      const_cast<float*>(get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset));
+  float* val_cache_ptr = const_cast<float*>(
+      get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset));
 
   auto key_cache = std::make_shared<base::Buffer>(config_->kv_dim_ * sizeof(float),
                                                   nullptr, key_cache_ptr, true);
@@ -390,7 +383,7 @@ base::Status LLama2Model::create_layers() {
   return error::Success();
 }
 
-EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) {
+EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
   auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
   for (int32_t i = 0; i < tokens.size(); ++i) {
@@ -411,10 +404,11 @@ EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) {
   return output;
 }
 
-void LLama2Model::fill_input(int32_t pos, int32_t next,
+void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
                              const std::vector<int32_t>& tokens, tensor::Tensor& input,
-                             const EmbeddingOutput& embedding_output) {
+                             const EmbeddingOutput& embedding_output) const {
   auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
+  const int32_t pos = pos_tensor.index<int32_t>(0);
   if (pos < tokens.size()) {
     // prefill steps
     std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
@@ -438,7 +432,7 @@ void LLama2Model::fill_input(int32_t pos, int32_t next,
   input.set_device_type(device_type_);
 }
 
-void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) {
+void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) const {
   // attn rmsnorm
   tensor::Tensor rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
   std::shared_ptr<op::Layer> rmsnorm_layer = llama_layers_->rmsnorm_layers_.at(layer_idx);
@@ -448,7 +442,8 @@ void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) 
   STATUS_CHECK(rmsnorm_layer->forward_i1o1(input, rmsnorm_output));
 }
 
-void LLama2Model::attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor) {
+void LLama2Model::attention_qkv(int32_t layer_idx,
+                                const tensor::Tensor& pos_tensor) const {
   // kv cache
   tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
   int32_t pos = pos_tensor.index<int32_t>(0);
@@ -480,7 +475,8 @@ void LLama2Model::attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_ten
       llama_layers_->rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
 }
 
-void LLama2Model::attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) {
+void LLama2Model::attention_mha(int32_t layer_idx,
+                                const tensor::Tensor& pos_tensor) const {
   // mha
   tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
   tensor::Tensor val_cache = get_buffer(ModelBufferType::kValueCache);
@@ -503,7 +499,7 @@ void LLama2Model::attention_mha(int32_t layer_idx, const tensor::Tensor& pos_ten
   STATUS_CHECK(wo_layer->forward_i1o1(mha_output, attn_output));
 }
 
-void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) {
+void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) const {
   // residual add
   CHECK_NE(llama_layers_->add_layer_, nullptr)
       << "The add layer in the feedforward block is null pointer";
@@ -548,7 +544,7 @@ void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) {
   STATUS_CHECK(llama_layers_->add_layer_->forward_i2o1(input, w2_output, input));
 }
 
-void LLama2Model::cls_logits(const tensor::Tensor& input) {
+void LLama2Model::cls_logits(const tensor::Tensor& input) const {
   const auto& norm = llama_layers_->rmsnorm_layers_.at(2 * config_->layer_num_);
   CHECK_NE(norm, nullptr);
   STATUS_CHECK(norm->forward_i1o1(input, input));
@@ -556,6 +552,19 @@ void LLama2Model::cls_logits(const tensor::Tensor& input) {
   tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
   CHECK_NE(llama_layers_->cls_layer_, nullptr);
   STATUS_CHECK(llama_layers_->cls_layer_->forward_i1o1(input, forward_output));
+}
+
+std::string LLama2Model::post_processing(int32_t pos, int32_t& next,
+                                         const std::vector<int32_t>& tokens) const {
+  tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
+  const float* forward_logits = forward_output.ptr<float>();
+  if (pos < tokens.size() - 1) {
+    next = tokens[pos + 1];
+  } else {
+    next = sampler_->sample(forward_logits, static_cast<int32_t>(forward_output.size()));
+  }
+  const std::string& output_str = this->encode_layer_->decode(next);
+  return output_str;
 }
 
 }  // namespace model
