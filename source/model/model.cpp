@@ -122,24 +122,24 @@ base::Status Model::read_model_file() {
 }
 
 base::Status Model::generate_model_infos(const ModelConfig& config) {
-  dim_ = config.dim;
-  hidden_dim_ = config.hidden_dim;
-  layer_num_ = config.layer_num;
-  head_num_ = config.head_num;
-  kv_head_num_ = config.head_num;
-  seq_len_ = config.seq_len;
+  config_->dim_ = config.dim;
+  config_->hidden_dim_ = config.hidden_dim;
+  config_->layer_num_ = config.layer_num;
+  config_->head_num_ = config.head_num;
+  config_->kv_head_num_ = config.head_num;
+  config_->seq_len_ = config.seq_len;
 
-  kv_dim_ = (config.dim * config.kv_head_num) / config.head_num;
-  kv_mul_ = config.head_num / config.kv_head_num;
-  head_size_ = config.dim / config.head_num;
+  config_->kv_dim_ = (config.dim * config.kv_head_num) / config.head_num;
+  config_->kv_mul_ = config.head_num / config.kv_head_num;
+  config_->head_size_ = config.dim / config.head_num;
 
   if (config.vocab_size > 0) {
-    is_shared_weight_ = true;
+    config_->is_shared_weight_ = true;
   } else {
-    is_shared_weight_ = false;
+    config_->is_shared_weight_ = false;
   }
 
-  if (std::abs(config.vocab_size) != vocab_size_) {
+  if (std::abs(config.vocab_size) != config_->vocab_size_) {
     return base::error::ModelParseError(
         "Vocabulary size mismatch between the model file and the token list.");
   }
@@ -155,8 +155,8 @@ base::Status Model::create_encode_layer() {
     return error::PathNotValid(token_path_);
   }
 
-  vocab_size_ = spe->GetPieceSize();
-  if (vocab_size_ <= 0) {
+  config_->vocab_size_ = spe->GetPieceSize();
+  if (config_->vocab_size_ <= 0) {
     return error::InternalError("The vocab size param read error from the model file!");
   }
 
@@ -185,7 +185,6 @@ base::Status Model::gen_model_from_file() {
     LOG(ERROR) << "Handle model file " << model_path_ << " failed!";
     return mmap_status;
   }
-
   auto layer_create_status = create_layers();
   if (!layer_create_status) {
     LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed!";

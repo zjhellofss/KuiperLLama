@@ -149,6 +149,12 @@ class Layer : public BaseLayer {
 
   void reset_output_size(size_t size);
 
+  void set_input_layer(std::shared_ptr<op::Layer> input_layer);
+
+  void set_output_layer(std::shared_ptr<op::Layer> output_layer);
+
+//  virtual void set_input_from_prev_layer(std::shared_ptr<op::Layer> prev_layer) = 0;
+
  private:
   std::vector<tensor::Tensor> inputs_;
   std::vector<tensor::Tensor> outputs_;
