@@ -193,12 +193,6 @@ size_t LayerFp32Param::weight_size() const {
 
 base::Status Layer::forward_i1o1(const tensor::Tensor& input1,
                                  const tensor::Tensor& output1) {
-  if (input1.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
-  if (output1.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
   this->set_input(0, input1);
   this->set_output(0, output1);
   return this->base_forward();
@@ -207,18 +201,9 @@ base::Status Layer::forward_i1o1(const tensor::Tensor& input1,
 base::Status Layer::forward_i2o1(const tensor::Tensor& input1,
                                  const tensor::Tensor& input2,
                                  const tensor::Tensor& output1) {
-  if (input1.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
-  if (input2.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
   this->set_input(0, input1);
   this->set_input(1, input2);
 
-  if (output1.is_empty()) {
-    return base::error::InvalidArgument("The output tensor1 is empty.");
-  }
   this->set_output(0, output1);
   return this->base_forward();
 }
@@ -227,22 +212,10 @@ base::Status Layer::forward_i3o1(const tensor::Tensor& input1,
                                  const tensor::Tensor& input2,
                                  const tensor::Tensor& input3,
                                  const tensor::Tensor& output1) {
-  if (input1.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
-  if (input2.is_empty()) {
-    return base::error::InvalidArgument("The input tensor2 is empty.");
-  }
-  if (input3.is_empty()) {
-    return base::error::InvalidArgument("The input tensor3 is empty.");
-  }
   this->set_input(0, input1);
   this->set_input(1, input2);
   this->set_input(2, input3);
 
-  if (output1.is_empty()) {
-    return base::error::InvalidArgument("The output tensor1 is empty.");
-  }
   this->set_output(0, output1);
   return this->base_forward();
 }
@@ -252,26 +225,11 @@ base::Status Layer::forward_i4o1(const tensor::Tensor& input1,
                                  const tensor::Tensor& input3,
                                  const tensor::Tensor& input4,
                                  const tensor::Tensor& output1) {
-  if (input1.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
-  if (input2.is_empty()) {
-    return base::error::InvalidArgument("The input tensor2 is empty.");
-  }
-  if (input3.is_empty()) {
-    return base::error::InvalidArgument("The input tensor3 is empty.");
-  }
-  if (input4.is_empty()) {
-    return base::error::InvalidArgument("The input tensor4 is empty.");
-  }
   this->set_input(0, input1);
   this->set_input(1, input2);
   this->set_input(2, input3);
   this->set_input(3, input4);
 
-  if (output1.is_empty()) {
-    return base::error::InvalidArgument("The output tensor1 is empty.");
-  }
   this->set_output(0, output1);
   return this->base_forward();
 }
@@ -282,30 +240,12 @@ base::Status Layer::forward_i5o1(const tensor::Tensor& input1,
                                  const tensor::Tensor& input4,
                                  const tensor::Tensor& input5,
                                  const tensor::Tensor& output1) {
-  if (input1.is_empty()) {
-    return base::error::InvalidArgument("The input tensor1 is empty.");
-  }
-  if (input2.is_empty()) {
-    return base::error::InvalidArgument("The input tensor2 is empty.");
-  }
-  if (input3.is_empty()) {
-    return base::error::InvalidArgument("The input tensor3 is empty.");
-  }
-  if (input4.is_empty()) {
-    return base::error::InvalidArgument("The input tensor4 is empty.");
-  }
-  if (input5.is_empty()) {
-    return base::error::InvalidArgument("The input tensor5 is empty.");
-  }
   this->set_input(0, input1);
   this->set_input(1, input2);
   this->set_input(2, input3);
   this->set_input(3, input4);
   this->set_input(4, input5);
 
-  if (output1.is_empty()) {
-    return base::error::InvalidArgument("The output tensor1 is empty.");
-  }
   this->set_output(0, output1);
   return this->base_forward();
 }

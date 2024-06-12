@@ -42,16 +42,16 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   while (pos < total_steps) {
     // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
-    tensor::Tensor input(base::DataType::kDataTypeFp32, dim_);
+    tensor::Tensor input(base::DataType::kDataTypeFp32, config_->dim_);
     fill_input(pos, next, tokens, input, embedding_output);
 
-    for (int32_t layer_idx = 0; layer_idx < layer_num_; ++layer_idx) {
+    for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
       attn_rmsnorm(layer_idx, input);
 
       // attention (wq wk wv @ input)
       attention_qkv(layer_idx, pos_tensor);
       // multi-head attention
-      attention_mha(layer_idx, pos);
+      attention_mha(layer_idx, pos_tensor);
       // feed forward
       feed_forward(layer_idx, input);
     }
@@ -77,32 +77,34 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 }
 
 void LLama2Model::create_nonparam_layers() {
-  rope_layer_ = std::make_shared<op::RoPELayer>(device_type_, dim_, kv_dim_, head_size_);
+  rope_layer_ = std::make_shared<op::RoPELayer>(device_type_, config_->dim_,
+                                                config_->kv_dim_, config_->head_size_);
 
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto mha_layer = std::make_shared<op::MultiHeadAttention>(
-        device_type_, i, kv_mul_, kv_dim_, seq_len_, head_num_, head_size_);
+        device_type_, i, config_->kv_mul_, config_->kv_dim_, config_->seq_len_,
+        config_->head_num_, config_->head_size_);
     mha_layers_.push_back(mha_layer);
   }
 
   add_layer_ = std::make_shared<op::VecAddLayer>(device_type_);
-  swiglu_layer_ = std::make_shared<op::SwiGLULayer>(device_type_, hidden_dim_);
+  swiglu_layer_ = std::make_shared<op::SwiGLULayer>(device_type_, config_->hidden_dim_);
 }
 
 void LLama2Model::create_param_layers() {
   // The embedding layer
-  embedding_layer_ = std::make_shared<op::EmbeddingLayer>(device_type_, dim_, seq_len_,
-                                                          std::abs(vocab_size_));
+  embedding_layer_ = std::make_shared<op::EmbeddingLayer>(
+      device_type_, config_->dim_, config_->seq_len_, std::abs(config_->vocab_size_));
 
   const float* weight_embedding = raw_model_data_->weight(0);
-  embedding_layer_->set_weight(0, {std::abs(vocab_size_), dim_}, weight_embedding,
-                               device_type_);
+  embedding_layer_->set_weight(0, {std::abs(config_->vocab_size_), config_->dim_},
+                               weight_embedding, device_type_);
 
   // create all matmul layer
-  int32_t dim = dim_;
-  size_t pos = dim * std::abs(vocab_size_) + dim * layer_num_;
+  int32_t dim = config_->dim_;
+  size_t pos = dim * std::abs(config_->vocab_size_) + dim * config_->layer_num_;
   // create weight matrix for query
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto wq = std::make_shared<op::MatmulLayer>(device_type_, dim, dim);
     wq->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), device_type_);
     pos += dim * dim;
@@ -110,23 +112,25 @@ void LLama2Model::create_param_layers() {
   }
 
   // create weight matrix for key
-  for (int32_t i = 0; i < layer_num_; ++i) {
-    auto wk = std::make_shared<op::MatmulLayer>(device_type_, kv_dim_, dim);
-    wk->set_weight(0, {kv_dim_, dim}, this->raw_model_data_->weight(pos), device_type_);
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto wk = std::make_shared<op::MatmulLayer>(device_type_, config_->kv_dim_, dim);
+    wk->set_weight(0, {config_->kv_dim_, dim}, this->raw_model_data_->weight(pos),
+                   device_type_);
     wk_layers_.push_back(wk);
-    pos += kv_dim_ * dim;
+    pos += config_->kv_dim_ * dim;
   }
 
   // create weight matrix for value
-  for (int32_t i = 0; i < layer_num_; ++i) {
-    auto wv = std::make_shared<op::MatmulLayer>(device_type_, kv_dim_, dim);
-    wv->set_weight(0, {kv_dim_, dim}, this->raw_model_data_->weight(pos), device_type_);
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto wv = std::make_shared<op::MatmulLayer>(device_type_, config_->kv_dim_, dim);
+    wv->set_weight(0, {config_->kv_dim_, dim}, this->raw_model_data_->weight(pos),
+                   device_type_);
     wv_layers_.push_back(wv);
-    pos += kv_dim_ * dim;
+    pos += config_->kv_dim_ * dim;
   }
 
   // create weight matrix for output
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto wo = std::make_shared<op::MatmulLayer>(device_type_, dim, dim);
     wo->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), device_type_);
     wo_layers_.push_back(wo);
@@ -134,11 +138,11 @@ void LLama2Model::create_param_layers() {
   }
 
   // skip ffn rmsnorm
-  pos += layer_num_ * dim;
+  pos += config_->layer_num_ * dim;
 
   // w1 layers
-  int32_t hidden_dim = hidden_dim_;
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  int32_t hidden_dim = config_->hidden_dim_;
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto w1 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim);
     w1->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos),
                    device_type_);
@@ -147,7 +151,7 @@ void LLama2Model::create_param_layers() {
   }
 
   // w2 layers
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto w2 = std::make_shared<op::MatmulLayer>(device_type_, dim, hidden_dim);
     w2->set_weight(0, {dim, hidden_dim}, this->raw_model_data_->weight(pos),
                    device_type_);
@@ -156,7 +160,7 @@ void LLama2Model::create_param_layers() {
   }
 
   // w3 layers
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto w3 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim);
     w3->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos),
                    device_type_);
@@ -166,56 +170,58 @@ void LLama2Model::create_param_layers() {
 
   // skip final rms weight
   pos += dim;
-  pos += seq_len_ * head_size_;
+  pos += config_->seq_len_ * config_->head_size_;
 
-  cls_layer_ = std::make_shared<op::MatmulLayer>(device_type_, vocab_size_, dim);
-  if (is_shared_weight_) {
+  cls_layer_ = std::make_shared<op::MatmulLayer>(device_type_, config_->vocab_size_, dim);
+  if (config_->is_shared_weight_) {
     // using token embedding weight
-    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(0),
-                           device_type_);
+    cls_layer_->set_weight(0, {config_->vocab_size_, dim},
+                           this->raw_model_data_->weight(0), device_type_);
   } else {
-    cls_layer_->set_weight(0, {vocab_size_, dim}, this->raw_model_data_->weight(pos),
-                           device_type_);
+    cls_layer_->set_weight(0, {config_->vocab_size_, dim},
+                           this->raw_model_data_->weight(pos), device_type_);
   }
 
   // create rmsnorm layer
-  size_t rmsnorm_pos = dim_ * std::abs(vocab_size_);
+  size_t rmsnorm_pos = config_->dim_ * std::abs(config_->vocab_size_);
 
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
-        std::make_shared<op::RmsNormLayer>(device_type_, dim_);
+        std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
 
     const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
-    rms_norm_layer->set_weight(0, {dim_}, weight_rmsnorm, device_type_);
+    rms_norm_layer->set_weight(0, {config_->dim_}, weight_rmsnorm, device_type_);
     rmsnorm_layers_.push_back(rms_norm_layer);
 
-    rmsnorm_pos += dim_;
+    rmsnorm_pos += config_->dim_;
   }
 
-  rmsnorm_pos += layer_num_ * dim_ * dim_;
-  rmsnorm_pos += layer_num_ * dim_ * (kv_head_num_ * head_size_);
-  rmsnorm_pos += layer_num_ * dim_ * (kv_head_num_ * head_size_);
-  rmsnorm_pos += layer_num_ * dim_ * dim_;
+  rmsnorm_pos += config_->layer_num_ * config_->dim_ * config_->dim_;
+  rmsnorm_pos +=
+      config_->layer_num_ * config_->dim_ * (config_->kv_head_num_ * config_->head_size_);
+  rmsnorm_pos +=
+      config_->layer_num_ * config_->dim_ * (config_->kv_head_num_ * config_->head_size_);
+  rmsnorm_pos += config_->layer_num_ * config_->dim_ * config_->dim_;
 
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
-        std::make_shared<op::RmsNormLayer>(device_type_, dim_);
+        std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
     const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
-    rms_norm_layer->set_weight(0, {dim_}, weight_rmsnorm, device_type_);
+    rms_norm_layer->set_weight(0, {config_->dim_}, weight_rmsnorm, device_type_);
     rmsnorm_layers_.push_back(rms_norm_layer);
 
-    rmsnorm_pos += dim_;
+    rmsnorm_pos += config_->dim_;
   }
 
-  rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
-  rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
-  rmsnorm_pos += layer_num_ * hidden_dim_ * dim_;
+  rmsnorm_pos += config_->layer_num_ * config_->hidden_dim_ * config_->dim_;
+  rmsnorm_pos += config_->layer_num_ * config_->hidden_dim_ * config_->dim_;
+  rmsnorm_pos += config_->layer_num_ * config_->hidden_dim_ * config_->dim_;
 
   std::shared_ptr<op::RmsNormLayer> rms_final_layer =
-      std::make_shared<op::RmsNormLayer>(device_type_, dim_);
+      std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
 
   const float* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
-  rms_final_layer->set_weight(0, {dim_}, weight_rmsnorm_final, device_type_);
+  rms_final_layer->set_weight(0, {config_->dim_}, weight_rmsnorm_final, device_type_);
   rmsnorm_layers_.push_back(rms_final_layer);
 }
 
@@ -226,42 +232,44 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) {
 
 void LLama2Model::init_mem() {
   auto alloc = base::CPUDeviceAllocatorFactory::get_instance();
-  int32_t max_seq_len = seq_len_;
+  int32_t max_seq_len = config_->seq_len_;
   tensor::Tensor input_tokens(base::DataType::kDataTypeInt32,
                               static_cast<int32_t>(max_seq_len), true, alloc);
-  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len, dim_, true,
-                                  alloc);
+  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len,
+                                  config_->dim_, true, alloc);
 
   CHECK(insert_buffer(ModelBufferType::kInputTokens, input_tokens));
   CHECK(insert_buffer(ModelBufferType::kInputEmbeddings, input_embeddings));
 
-  tensor::Tensor rms_output(base::DataType::kDataTypeFp32, dim_, true, alloc);
+  tensor::Tensor rms_output(base::DataType::kDataTypeFp32, config_->dim_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kOutputRMSNorm, rms_output));
   CHECK(insert_buffer(ModelBufferType::kOutputMHA, rms_output));
   CHECK(insert_buffer(ModelBufferType::kW2Output, rms_output));
   CHECK(insert_buffer(ModelBufferType::kFFNRMSNorm, rms_output));
 
-  tensor::Tensor score_storage(base::DataType::kDataTypeFp32, head_size_, seq_len_, true,
-                               alloc);
+  tensor::Tensor score_storage(base::DataType::kDataTypeFp32, config_->head_size_,
+                               config_->seq_len_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kKeyStorage, score_storage));
 
-  tensor::Tensor w1_output(base::DataType::kDataTypeFp32, hidden_dim_, true, alloc);
-  tensor::Tensor w3_output(base::DataType::kDataTypeFp32, hidden_dim_, true, alloc);
+  tensor::Tensor w1_output(base::DataType::kDataTypeFp32, config_->hidden_dim_, true,
+                           alloc);
+  tensor::Tensor w3_output(base::DataType::kDataTypeFp32, config_->hidden_dim_, true,
+                           alloc);
 
   CHECK(insert_buffer(ModelBufferType::kW1Output, w1_output));
   CHECK(insert_buffer(ModelBufferType::kW3Output, w3_output));
 
   // kv cache
-  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_,
-                           true, alloc);
-  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, layer_num_, seq_len_, kv_dim_,
-                             true, alloc);
+  tensor::Tensor key_cache(base::DataType::kDataTypeFp32, config_->layer_num_,
+                           config_->seq_len_, config_->kv_dim_, true, alloc);
+  tensor::Tensor value_cache(base::DataType::kDataTypeFp32, config_->layer_num_,
+                             config_->seq_len_, config_->kv_dim_, true, alloc);
 
   CHECK(insert_buffer(ModelBufferType::kKeyCache, key_cache));
   CHECK(insert_buffer(ModelBufferType::kValueCache, value_cache));
 
   // Wq query output
-  tensor::Tensor query(base::DataType::kDataTypeFp32, dim_, true, alloc);
+  tensor::Tensor query(base::DataType::kDataTypeFp32, config_->dim_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kQuery, query));
 
   // Pos tensor
@@ -269,32 +277,35 @@ void LLama2Model::init_mem() {
   CHECK(insert_buffer(ModelBufferType::kInputPos, pos_tensor));
 
   // Attention output
-  tensor::Tensor attn(base::DataType::kDataTypeFp32, head_num_, seq_len_, true, alloc);
+  tensor::Tensor attn(base::DataType::kDataTypeFp32, config_->head_num_,
+                      config_->seq_len_, true, alloc);
   CHECK(insert_buffer(ModelBufferType::kScoreStorage, attn));
   CHECK(insert_buffer(ModelBufferType::kAttnOutput, query));
 
   // final forward output
-  tensor::Tensor forward_output(base::DataType::kDataTypeFp32, vocab_size_, true, alloc);
+  tensor::Tensor forward_output(base::DataType::kDataTypeFp32, config_->vocab_size_, true,
+                                alloc);
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
 }
 
 std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
                                                                       int32_t token_pos) {
-  int32_t layer_offset = layer_idx * seq_len_ * kv_dim_;
-  int32_t cache_offset = static_cast<int32_t>(layer_offset + token_pos * kv_dim_);
+  int32_t layer_offset = layer_idx * config_->seq_len_ * config_->kv_dim_;
+  int32_t cache_offset =
+      static_cast<int32_t>(layer_offset + token_pos * config_->kv_dim_);
 
   float* key_cache_ptr = get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset);
   float* val_cache_ptr =
       get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset);
 
-  auto key_cache = std::make_shared<base::Buffer>(kv_dim_ * sizeof(float), nullptr,
-                                                  key_cache_ptr, true);
-  auto val_cache = std::make_shared<base::Buffer>(kv_dim_ * sizeof(float), nullptr,
-                                                  val_cache_ptr, true);
+  auto key_cache = std::make_shared<base::Buffer>(config_->kv_dim_ * sizeof(float),
+                                                  nullptr, key_cache_ptr, true);
+  auto val_cache = std::make_shared<base::Buffer>(config_->kv_dim_ * sizeof(float),
+                                                  nullptr, val_cache_ptr, true);
   key_cache->set_device_type(device_type_);
   val_cache->set_device_type(device_type_);
-  tensor::Tensor key(base::DataType::kDataTypeFp32, kv_dim_);
-  tensor::Tensor val(base::DataType::kDataTypeFp32, kv_dim_);
+  tensor::Tensor key(base::DataType::kDataTypeFp32, config_->kv_dim_);
+  tensor::Tensor val(base::DataType::kDataTypeFp32, config_->kv_dim_);
   key.assign(key_cache);
   val.assign(val_cache);
   return {key, val};
@@ -309,19 +320,21 @@ base::Status LLama2Model::create_layers() {
     return error::InternalError("Create the embedding layer for the llama model failed!");
   }
 
-  if (rmsnorm_layers_.size() != 2 * layer_num_ + 1) {
+  if (rmsnorm_layers_.size() != 2 * config_->layer_num_ + 1) {
     return error::InternalError("Create the rmsnorm layers for the llama model failed!");
   }
 
-  if (wq_layers_.size() != layer_num_ || wk_layers_.size() != layer_num_ ||
-      wv_layers_.size() != layer_num_ || wo_layers_.size() != layer_num_) {
+  if (wq_layers_.size() != config_->layer_num_ ||
+      wk_layers_.size() != config_->layer_num_ ||
+      wv_layers_.size() != config_->layer_num_ ||
+      wo_layers_.size() != config_->layer_num_) {
     return error::InternalError(
         "Create the matmul layer in the attention and ffn attention layers for "
         "the llama model "
         "failed.");
   }
 
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     if (!wq_layers_.at(i) || !wk_layers_.at(i) || !wv_layers_.at(i) ||
         !wo_layers_.at(i)) {
       return error::InternalError(
@@ -331,14 +344,15 @@ base::Status LLama2Model::create_layers() {
     }
   }
 
-  if (w1_layers_.size() != layer_num_ || w2_layers_.size() != layer_num_ ||
-      w3_layers_.size() != layer_num_) {
+  if (w1_layers_.size() != config_->layer_num_ ||
+      w2_layers_.size() != config_->layer_num_ ||
+      w3_layers_.size() != config_->layer_num_) {
     return error::InternalError(
         "Create the matmul layer in the feedforward layers for the llama model "
         "failed.");
   }
 
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     if (!w1_layers_.at(i) || !w2_layers_.at(i) || !w3_layers_.at(i)) {
       return error::InternalError(
           "Create the matmul layer in the feedforward layers for the llama model "
@@ -354,10 +368,10 @@ base::Status LLama2Model::create_layers() {
     return error::InternalError("Create the add layer for the llama model failed!");
   }
 
-  if (mha_layers_.size() != layer_num_) {
+  if (mha_layers_.size() != config_->layer_num_) {
     return error::InternalError("Create the mha layer for the llama model failed!");
   }
-  for (int32_t i = 0; i < layer_num_; ++i) {
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     if (!mha_layers_.at(i)) {
       return error::InternalError("Create the mha layer for the llama model failed!");
     }
@@ -397,7 +411,8 @@ void LLama2Model::fill_input(int32_t pos, int32_t next,
   if (pos < tokens.size()) {
     // prefill steps
     std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-        dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(pos * dim_), true);
+        config_->dim_ * sizeof(float), nullptr,
+        input_embeddings.ptr<float>(pos * config_->dim_), true);
     input.assign(input_emb_buffer);
   } else {
     // generate steps
@@ -410,7 +425,7 @@ void LLama2Model::fill_input(int32_t pos, int32_t next,
         embedding_layer_->forward_i2o1(input_tokens, input_token_num, input_embeddings));
 
     std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-        dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
+        config_->dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
     input.assign(input_emb_buffer);
   }
   input.set_device_type(device_type_);
@@ -457,7 +472,7 @@ void LLama2Model::attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_ten
   STATUS_CHECK(rope_layer_->forward_i3o1(query, key, pos_tensor, tensor::Tensor{}));
 }
 
-void LLama2Model::attention_mha(int32_t layer_idx, int32_t pos) {
+void LLama2Model::attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) {
   // mha
   tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
   tensor::Tensor val_cache = get_buffer(ModelBufferType::kValueCache);
@@ -489,7 +504,7 @@ void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) {
 
   // ffn rmsnorm
   tensor::Tensor ffn_norm_output = get_buffer(ModelBufferType::kFFNRMSNorm);
-  const auto& ffn_rmsnorm = rmsnorm_layers_.at(layer_idx + layer_num_);
+  const auto& ffn_rmsnorm = rmsnorm_layers_.at(layer_idx + config_->layer_num_);
   CHECK_NE(ffn_rmsnorm, nullptr)
       << "The final rmsnorm layer in the feedforward block is null pointer";
   STATUS_CHECK(ffn_rmsnorm->forward_i1o1(input, ffn_norm_output));
@@ -524,7 +539,7 @@ void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) {
 }
 
 void LLama2Model::cls_logits(const tensor::Tensor& input) {
-  const auto& norm = rmsnorm_layers_.at(2 * layer_num_);
+  const auto& norm = rmsnorm_layers_.at(2 * config_->layer_num_);
   CHECK_NE(norm, nullptr);
   STATUS_CHECK(norm->forward_i1o1(input, input));
 

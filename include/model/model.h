@@ -2,7 +2,7 @@
 #define KUIPER_INCLUDE_MODEL_MODEL_H_
 #include <map>
 #include <string>
-#include "llama2_config.h"
+#include "config.h"
 #include "op/add.h"
 #include "op/embedding.h"
 #include "op/encode.h"
@@ -14,6 +14,7 @@
 #include "sampler/argmax_sampler.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
+#include "transformer_config.h"
 
 namespace model {
 enum class ModelBufferType {
@@ -91,23 +92,17 @@ class Model {
   virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
                                                                    int32_t token_pos) = 0;
 
- protected:
-  int32_t kv_dim_ = 0;
-  int32_t kv_mul_ = 0;
-  int32_t head_size_ = 0;
-  int32_t vocab_size_ = 0;
+  virtual void create_param_layers() = 0;
 
-  int32_t dim_ = 0;
-  int32_t hidden_dim_ = 0;
-  int32_t layer_num_ = 0;
-  int32_t head_num_ = 0;
-  int32_t kv_head_num_ = 0;
-  int32_t seq_len_ = 0;
-  bool is_shared_weight_ = false;
+  virtual void create_nonparam_layers() = 0;
+
+ protected:
+  std::unique_ptr<TransformerConfig> config_;
 
   std::string token_path_;
   std::string model_path_;
   std::unique_ptr<op::EncodeLayer> encode_layer_;
+  std::shared_ptr<std::shared_ptr<op::Layer>> sorted_layers_;
   std::map<ModelBufferType, tensor::Tensor> buffers_;
   std::unique_ptr<sampler::Sampler> sampler_;
   std::shared_ptr<RawModelData> raw_model_data_;

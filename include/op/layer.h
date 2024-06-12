@@ -152,6 +152,8 @@ class Layer : public BaseLayer {
  private:
   std::vector<tensor::Tensor> inputs_;
   std::vector<tensor::Tensor> outputs_;
+  std::vector<std::shared_ptr<op::Layer>> input_layers_;
+  std::vector<std::shared_ptr<op::Layer>> output_layers_;
 };
 
 class LayerFp32Param : public Layer {
