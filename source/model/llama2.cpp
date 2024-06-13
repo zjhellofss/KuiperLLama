@@ -57,8 +57,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     }
 
     cls_logits(input);
-    std::string decode_str = post_processing(pos, next, tokens);
-    std::cout << decode_str << " " << std::flush;
+    const std::string& decode_str = post_processing(pos, next, tokens);
+    LOG(INFO) << decode_str;
     if (next == eos) {
       break;
     }
@@ -69,6 +69,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 }
 
 void LLama2Model::create_nonparam_layers() {
+  CHECK(llama_layers_ != nullptr);
   llama_layers_->rope_layer_ = std::make_shared<op::RoPELayer>(
       device_type_, config_->dim_, config_->kv_dim_, config_->head_size_);
 
@@ -85,6 +86,7 @@ void LLama2Model::create_nonparam_layers() {
 }
 
 void LLama2Model::create_param_layers() {
+  CHECK(llama_layers_ != nullptr);
   // The embedding layer
   llama_layers_->embedding_layer_ = std::make_shared<op::EmbeddingLayer>(
       device_type_, config_->dim_, config_->seq_len_, std::abs(config_->vocab_size_));
@@ -371,6 +373,7 @@ base::Status LLama2Model::create_layers() {
   if (llama_layers_->mha_layers_.size() != config_->layer_num_) {
     return error::InternalError("Create the mha layer for the llama model failed!");
   }
+
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     if (!llama_layers_->mha_layers_.at(i)) {
       return error::InternalError("Create the mha layer for the llama model failed!");
