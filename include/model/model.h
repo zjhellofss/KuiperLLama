@@ -14,7 +14,7 @@
 #include "sampler/argmax_sampler.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
-#include "transformer_config.h"
+#include "config.h"
 
 namespace model {
 enum class ModelBufferType {

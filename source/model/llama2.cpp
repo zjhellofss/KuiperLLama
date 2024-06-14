@@ -33,12 +33,13 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     return base::error::InvalidArgument("The token array is empty.");
   }
   CHECK(device_type_ == base::DeviceType::kDeviceCPU);
-  const auto& embedding_output = embedding(tokens);
 
+  const auto& embedding_output = embedding(tokens);
   int32_t pos = 0;
   int32_t next = -1;
   int32_t eos = encode_layer_->eos();
   tensor::Tensor pos_tensor = get_buffer(ModelBufferType::kInputPos);
+  TICK(B)
   while (pos < total_steps) {
     // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
@@ -58,12 +59,12 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
     cls_logits(input);
     const std::string& decode_str = post_processing(pos, next, tokens);
-    LOG(INFO) << decode_str;
     if (next == eos) {
       break;
     }
     pos += 1;
   }
+  TOCK(B)
   LOG(INFO) << "The word decode count: " << pos;
   return base::error::Success();
 }
@@ -389,6 +390,7 @@ base::Status LLama2Model::create_layers() {
 EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
   auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
+  input_tokens.reshape({(int32_t)tokens.size()});
   for (int32_t i = 0; i < tokens.size(); ++i) {
     input_tokens.index<int32_t>(i) = tokens.at(i);
   }
@@ -410,18 +412,24 @@ EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
 void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
                              const std::vector<int32_t>& tokens, tensor::Tensor& input,
                              const EmbeddingOutput& embedding_output) const {
-  auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
+  CHECK(llama_layers_ != nullptr);
   const int32_t pos = pos_tensor.index<int32_t>(0);
   if (pos < tokens.size()) {
+    auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
     // prefill steps
     std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
         config_->dim_ * sizeof(float), nullptr,
         input_embeddings.ptr<float>(pos * config_->dim_), true);
     input.assign(input_emb_buffer);
   } else {
+    CHECK(llama_layers_ != nullptr);
     // generate steps
+    auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
+    auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
+    auto input_token_num = tensor::Tensor(base::DataType::kDataTypeInt32, 1);
+
     CHECK_NE(next, -1) << "The next token is -1.";
-    input_token_num.reshape({1});
+    input_tokens.reshape({1});
     input_tokens.index<int32_t>(0) = next;
     CHECK_NE(llama_layers_->embedding_layer_, nullptr)
         << "The embedding layer in the llama2 model is null pointer.";
@@ -436,6 +444,7 @@ void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
 }
 
 void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) const {
+  CHECK(llama_layers_ != nullptr);
   // attn rmsnorm
   tensor::Tensor rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
   std::shared_ptr<op::Layer> rmsnorm_layer = llama_layers_->rmsnorm_layers_.at(layer_idx);
@@ -447,6 +456,7 @@ void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) 
 
 void LLama2Model::attention_qkv(int32_t layer_idx,
                                 const tensor::Tensor& pos_tensor) const {
+  CHECK(llama_layers_ != nullptr);
   // kv cache
   tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
   int32_t pos = pos_tensor.index<int32_t>(0);
@@ -480,6 +490,7 @@ void LLama2Model::attention_qkv(int32_t layer_idx,
 
 void LLama2Model::attention_mha(int32_t layer_idx,
                                 const tensor::Tensor& pos_tensor) const {
+  CHECK(llama_layers_ != nullptr);
   // mha
   tensor::Tensor key_cache = get_buffer(ModelBufferType::kKeyCache);
   tensor::Tensor val_cache = get_buffer(ModelBufferType::kValueCache);
@@ -503,6 +514,7 @@ void LLama2Model::attention_mha(int32_t layer_idx,
 }
 
 void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) const {
+  CHECK(llama_layers_ != nullptr);
   // residual add
   CHECK_NE(llama_layers_->add_layer_, nullptr)
       << "The add layer in the feedforward block is null pointer";
@@ -548,6 +560,7 @@ void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) c
 }
 
 void LLama2Model::cls_logits(const tensor::Tensor& input) const {
+  CHECK(llama_layers_ != nullptr);
   const auto& norm = llama_layers_->rmsnorm_layers_.at(2 * config_->layer_num_);
   CHECK_NE(norm, nullptr);
   STATUS_CHECK(norm->forward_i1o1(input, input));

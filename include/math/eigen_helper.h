@@ -1,8 +1,0 @@
-//
-// Created by hello on 2024/4/30.
-//
-
-#ifndef KUIPER_INCLUDE_MATH_EIGEN_HELPER_H_
-#define KUIPER_INCLUDE_MATH_EIGEN_HELPER_H_
-
-#endif  // KUIPER_INCLUDE_MATH_EIGEN_HELPER_H_

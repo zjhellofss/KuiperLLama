@@ -5,7 +5,7 @@
 #include "base/buffer.h"
 #include "model/llama2.h"
 #include "tensor/tensor.h"
-
+#include "base/tick.h"
 int main(int argc, char* argv[]) {
   if (argc != 3) {
     LOG(INFO) << "Usage: ./demo checkpoint_path tokenizer_path ";
@@ -20,8 +20,9 @@ int main(int argc, char* argv[]) {
   model.init(base::DeviceType::kDeviceCPU);
   std::string sentence = "Hi everyone";
   const auto& tokens = model.encode(sentence);
-  const auto s = model.forward(tokens, 1024);
-
+  TICK(A)
+  const auto s = model.forward(tokens, 32);
+  TOCK(A)
   LOG(INFO) << s;
   return 0;
 }

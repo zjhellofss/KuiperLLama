@@ -22,7 +22,7 @@ base::Status EmbeddingLayer::check() const {
   }
 
   base::Status status = check_tensor_with_dim(input_tensor, device_type_,
-                                              base::DataType::kDataTypeInt32, seq_len_);
+                                              base::DataType::kDataTypeInt32, token_size);
   if (!status) {
     LOG(ERROR) << "The input tensor error in the embedding layer.";
     return status;
