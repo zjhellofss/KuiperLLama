@@ -59,6 +59,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
     cls_logits(input);
     const std::string& decode_str = post_processing(pos, next, tokens);
+    LOG(INFO) << decode_str;
     if (next == eos) {
       break;
     }

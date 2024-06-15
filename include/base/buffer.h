@@ -38,6 +38,8 @@ class Buffer : public NoCopyable, std::enable_shared_from_this<Buffer> {
   void set_device_type(DeviceType device_type);
 
   std::shared_ptr<Buffer> get_shared_from_this();
+
+  bool is_external() const;
 };
 }  // namespace base
 

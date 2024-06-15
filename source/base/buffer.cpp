@@ -87,4 +87,8 @@ std::shared_ptr<Buffer> Buffer::get_shared_from_this() {
   return shared_from_this();
 }
 
+bool Buffer::is_external() const {
+  return this->use_external_;
+}
+
 }  // namespace base

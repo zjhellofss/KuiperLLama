@@ -3,7 +3,7 @@
 #include "base/alloc.h"
 
 #if (defined(_POSIX_ADVISORY_INFO) && (_POSIX_ADVISORY_INFO >= 200112L))
-#define EDGE_HAVE_POSIX_MEMALIGN
+#define KUIPER_HAVE_POSIX_MEMALIGN
 #endif
 
 namespace base {
@@ -14,7 +14,7 @@ void* CPUDeviceAllocator::allocate(size_t byte_size) const {
   if (!byte_size) {
     return nullptr;
   }
-#ifdef EDGE_HAVE_POSIX_MEMALIGN
+#ifdef KUIPER_HAVE_POSIX_MEMALIGN
   void* data = nullptr;
   const size_t alignment = (byte_size >= size_t(1024)) ? size_t(32) : size_t(16);
   int status = posix_memalign((void**)&data,
