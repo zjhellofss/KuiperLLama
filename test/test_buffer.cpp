@@ -6,7 +6,7 @@ TEST(test_buffer, allocate) {
   using namespace base;
   auto alloc = base::CPUDeviceAllocatorFactory::get_instance();
   Buffer buffer(32, alloc);
-  CHECK_NE(buffer.ptr(), nullptr);
+  ASSERT_NE(buffer.ptr(), nullptr);
 }
 
 TEST(test_buffer, use_external) {
@@ -14,6 +14,6 @@ TEST(test_buffer, use_external) {
   auto alloc = base::CPUDeviceAllocatorFactory::get_instance();
   float* ptr = new float[32];
   Buffer buffer(32, nullptr, ptr, true);
-  CHECK_EQ(buffer.is_external(), true);
+  ASSERT_EQ(buffer.is_external(), true);
   delete[] ptr;
 }
