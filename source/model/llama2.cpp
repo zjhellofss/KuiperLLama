@@ -39,7 +39,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
   int32_t next = -1;
   int32_t eos = encode_layer_->eos();
   tensor::Tensor pos_tensor = get_buffer(ModelBufferType::kInputPos);
-  TICK(B)
   while (pos < total_steps) {
     // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
@@ -65,8 +64,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     }
     pos += 1;
   }
-  TOCK(B)
-  LOG(INFO) << "The word decode count: " << pos;
   return base::error::Success();
 }
 
