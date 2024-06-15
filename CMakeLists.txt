@@ -18,11 +18,11 @@ add_library(llama SHARED ${DIR_TENSOR} ${DIR_BASE} ${DIR_OP} ${DIR_MODEL} ${DIR_
 target_link_libraries(llama sentencepiece glog::glog)
 target_link_libraries(llama ${ARMADILLO_LIBRARIES})
 target_include_directories(llama PUBLIC ${glog_INCLUDE_DIR})
-target_include_directories(llama PUBLIC kuiper/include)
+target_include_directories(llama PUBLIC ${PROJECT_SOURCE_DIR}/kuiper/include)
 target_include_directories(llama PUBLIC ${Armadillo_INCLUDE_DIR})
 
 add_executable(llama_infer main.cpp)
 target_link_directories(llama_infer PUBLIC ${PROJECT_SOURCE_DIR}/lib)
-target_link_libraries(llama_infer  llama)
+target_link_libraries(llama_infer llama)
 
 add_subdirectory(test)
