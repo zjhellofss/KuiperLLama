@@ -58,7 +58,7 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
     cls_logits(input);
     const std::string& decode_str = post_processing(pos, next, tokens);
-    LOG(INFO) << decode_str;
+    std::cout << next << " " << decode_str << "\n" << std::flush;
     if (next == eos) {
       break;
     }
@@ -286,8 +286,7 @@ void LLama2Model::init_mem() {
 std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(
     int32_t layer_idx, int32_t token_pos) const {
   int32_t layer_offset = layer_idx * config_->seq_len_ * config_->kv_dim_;
-  int32_t cache_offset =
-      static_cast<int32_t>(layer_offset + token_pos * config_->kv_dim_);
+  int32_t cache_offset = layer_offset + token_pos * config_->kv_dim_;
 
   float* key_cache_ptr =
       const_cast<float*>(get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset));

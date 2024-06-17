@@ -15,8 +15,8 @@ void matmul_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight
   arma::fmat weight_mat(const_cast<float*>(weight_ptr), wei_dim1, wei_dim0, false, true);
   arma::fmat output_mat(const_cast<float*>(output_ptr), 1, wei_dim0, false, true);
 
-  output_mat = input_vec * weight_mat;
   // W(dim0, dim1) @ x(dim1) = (dim0) ---> x^t(1,dim1) @ w^t (dim1, dim0)
+  output_mat = input_vec * weight_mat;
 }
 
 MatMulKernel get_matmul_kernel(base::DeviceType device_type) {

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(llama_infer)
+project(llama_infer CXX CUDA)
+include(cmake/cuda.cmake)
 
-set(CMAKE_CXX_STANDARD 20)
 find_package(glog REQUIRED)
 find_package(Armadillo REQUIRED)
 
@@ -21,8 +21,9 @@ target_include_directories(llama PUBLIC ${glog_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${PROJECT_SOURCE_DIR}/kuiper/include)
 target_include_directories(llama PUBLIC ${Armadillo_INCLUDE_DIR})
 
-add_executable(llama_infer main.cpp)
+add_executable(llama_infer main.cu)
 target_link_directories(llama_infer PUBLIC ${PROJECT_SOURCE_DIR}/lib)
 target_link_libraries(llama_infer llama)
+set_target_properties(llama_infer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 add_subdirectory(test)
