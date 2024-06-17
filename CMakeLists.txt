@@ -14,16 +14,15 @@ aux_source_directory(kuiper/source/sampler DIR_SAMPLE)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
-add_library(llama SHARED ${DIR_TENSOR} ${DIR_BASE} ${DIR_OP} ${DIR_MODEL} ${DIR_KERNEL} ${DIR_SAMPLE})
-target_link_libraries(llama sentencepiece glog::glog)
-target_link_libraries(llama ${ARMADILLO_LIBRARIES})
+add_library(llama ${DIR_TENSOR} ${DIR_BASE} ${DIR_OP} ${DIR_MODEL} ${DIR_KERNEL} ${DIR_SAMPLE})
+target_link_libraries(llama sentencepiece glog::glog cudart ${ARMADILLO_LIBRARIES})
+target_link_directories(llama PUBLIC ${CMAKE_CUDA_COMPILER_LIBRARY_ROOT}/lib64)
+
 target_include_directories(llama PUBLIC ${glog_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${PROJECT_SOURCE_DIR}/kuiper/include)
 target_include_directories(llama PUBLIC ${Armadillo_INCLUDE_DIR})
-
-add_executable(llama_infer main.cu)
-target_link_directories(llama_infer PUBLIC ${PROJECT_SOURCE_DIR}/lib)
-target_link_libraries(llama_infer llama)
-set_target_properties(llama_infer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+target_include_directories(llama PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 add_subdirectory(test)
+add_subdirectory(demo)

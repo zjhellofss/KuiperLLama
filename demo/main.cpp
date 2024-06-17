@@ -3,9 +3,6 @@
 #include "base/alloc.h"
 #include "model/llama2.h"
 int main(int argc, char* argv[]) {
-  float*arr = nullptr;
-  cudaMalloc(&arr,1);
-  cudaError_t err = cudaGetLastError();
   if (argc != 3) {
     LOG(INFO) << "Usage: ./demo checkpoint_path tokenizer_path ";
     return -1;
