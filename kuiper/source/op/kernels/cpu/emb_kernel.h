@@ -7,9 +7,8 @@
 #include "base/base.h"
 #include "tensor/tensor.h"
 namespace kernel {
-typedef void (*EmbeddingKernel)(const tensor::Tensor& input, const tensor::Tensor& weight,
-                                const tensor::Tensor& output, int32_t vocab_size);
-
-EmbeddingKernel get_emb_kernel(base::DeviceType device_type);
+void emb_kernel_normal(const tensor::Tensor& input, const tensor::Tensor& weight,
+                       const tensor::Tensor& output, int32_t vocab_size,
+                       void* stream = nullptr);
 }  // namespace kernel
 #endif  // KUIPER_INFER_EMB_KERNEL_H

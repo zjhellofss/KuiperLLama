@@ -24,7 +24,8 @@ class DeviceAllocator {
   virtual void* allocate(size_t byte_size) const = 0;
 
   virtual void memcpy(const void* src_ptr, void* dest_ptr, size_t byte_size,
-                      MemcpyKind memcpy_kind = MemcpyKind::kMemcpyCPU2CPU) const;
+                      MemcpyKind memcpy_kind = MemcpyKind::kMemcpyCPU2CPU,
+                      void* stream = nullptr) const;
 
  private:
   DeviceType device_type_ = DeviceType::kDeviceUnknown;
