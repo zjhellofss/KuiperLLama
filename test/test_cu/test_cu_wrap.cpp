@@ -1,7 +1,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <armadillo>
-#include "test_cu.cuh"
+#include "../utils.cuh"
 
 TEST(test_cu, test_function) {
   int32_t size = 32;

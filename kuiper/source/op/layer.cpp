@@ -84,7 +84,7 @@ base::Status Layer::check_tensor_with_dim(const tensor::Tensor& tensor,
     int32_t dim = va_arg(args, int32_t);
     if (dim != tensor.get_dim(i)) {
       return base::error::InvalidArgument("The tensor has a wrong dim in dim" +
-                                        std::to_string(i));
+                                          std::to_string(i));
     }
   }
   va_end(args);
@@ -94,12 +94,18 @@ base::Status Layer::check_tensor_with_dim(const tensor::Tensor& tensor,
 void Layer::set_input(int32_t idx, const tensor::Tensor& input) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, inputs_.size());
+  if (!input.is_empty()) {
+    CHECK(input.device_type() == device_type_);
+  }
   this->inputs_.at(idx) = input;
 }
 
 void Layer::set_output(int32_t idx, const tensor::Tensor& output) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, outputs_.size());
+  if (!output.is_empty()) {
+    CHECK(output.device_type() == device_type_);
+  }
   this->outputs_.at(idx) = output;
 }
 
@@ -139,6 +145,19 @@ void Layer::reset_output_size(size_t size) {
   outputs_.resize(size);
 }
 
+void Layer::to_cuda() {
+  for (auto& input : inputs_) {
+    if (!input.is_empty()) {
+      input.to_cuda();
+    }
+  }
+  for (auto& output : outputs_) {
+    if (!output.is_empty()) {
+      output.to_cuda();
+    }
+  }
+}
+
 size_t Layer::input_size() const {
   return inputs_.size();
 }
@@ -156,6 +175,9 @@ void LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   CHECK(weight.data_type() == base::DataType::kDataTypeFp32);
+  if (!weight.is_empty()) {
+    CHECK(weight.device_type() == device_type_);
+  }
   weights_.at(idx) = weight;
 }
 
@@ -165,10 +187,19 @@ const tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) const {
   return weights_.at(idx);
 }
 
+void LayerFp32Param::to_cuda() {
+  Layer::to_cuda();
+  for (auto& weight : weights_) {
+    weight.to_cuda();
+  }
+}
+
 void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
                                 const float* weight_ptr, base::DeviceType device_type) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
+  CHECK_NE(weight_ptr, nullptr);
+  CHECK(device_type == device_type_);
 
   size_t size =
       std::accumulate(dims.begin(), dims.end(), sizeof(float), std::multiplies<>());

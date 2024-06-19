@@ -43,6 +43,8 @@ class Tensor {
 
   void reshape(const std::vector<int32_t>& dims);
 
+  std::shared_ptr<base::Buffer> get_buffer() const;
+
   size_t size() const;
 
   size_t byte_size() const;
@@ -80,6 +82,8 @@ class Tensor {
   template <typename T>
   const T& index(int64_t offset) const;
 
+  tensor::Tensor clone() const;
+
  private:
   size_t size_ = 0;
   std::vector<int32_t> dims_;
@@ -98,6 +102,7 @@ const T& Tensor::index(int64_t offset) const {
   const T& val = *(reinterpret_cast<T*>(buffer_->ptr()) + offset);
   return val;
 }
+
 
 template <typename T>
 const T* Tensor::ptr() const {

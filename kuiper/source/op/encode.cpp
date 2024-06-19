@@ -21,6 +21,7 @@ int32_t EncodeLayer::eos() const {
 
 std::vector<int32_t> EncodeLayer::encode(const std::string& sentence) const {
   CHECK(spe != nullptr);
+  // sentencepiece
   std::vector<int32_t> input_ids = spe->EncodeAsIds(sentence);
   if (has_bos_) {
     input_ids.insert(input_ids.begin(), spe->bos_id());

@@ -1,4 +1,5 @@
 #include "tensor/tensor.h"
+#include <device_atomic_functions.h>
 #include <glog/logging.h>
 #include <numeric>
 
@@ -66,40 +67,36 @@ Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
 
 void Tensor::to_cuda() {
   CHECK_NE(buffer_, nullptr);
-  CHECK_NE(buffer_->allocator(), nullptr);
   const base::DeviceType device_type = this->device_type();
   if (device_type == base::DeviceType::kDeviceUnknown) {
     LOG(ERROR) << "The device type of the tensor is unknown.";
-  }
-
-  if (device_type == base::DeviceType::kDeviceCPU) {
+  } else if (device_type == base::DeviceType::kDeviceCPU) {
     size_t byte_size = this->byte_size();
-    auto cpu_alloc = buffer_->allocator();
     auto cu_alloc = base::CUDADeviceAllocatorFactory::get_instance();
     auto cu_buffer = std::make_shared<base::Buffer>(byte_size, cu_alloc);
     cu_alloc->memcpy(buffer_->ptr(), cu_buffer->ptr(), byte_size,
                      base::MemcpyKind::kMemcpyCPU2CUDA);
     this->buffer_ = cu_buffer;
+  } else {
+    LOG(INFO) << "The device type of the tensor is already cpu.";
   }
 }
 
 void Tensor::to_cpu() {
   CHECK_NE(buffer_, nullptr);
-  CHECK_NE(buffer_->allocator(), nullptr);
   const base::DeviceType device_type = this->device_type();
 
   if (device_type == base::DeviceType::kDeviceUnknown) {
     LOG(ERROR) << "The device type of the tensor is unknown.";
-  }
-
-  if (device_type == base::DeviceType::kDeviceCUDA) {
+  } else if (device_type == base::DeviceType::kDeviceCUDA) {
     size_t byte_size = this->byte_size();
-    auto cu_alloc = buffer_->allocator();
     auto cpu_alloc = base::CPUDeviceAllocatorFactory::get_instance();
     auto cpu_buffer = std::make_shared<base::Buffer>(byte_size, cpu_alloc);
-    cu_alloc->memcpy(buffer_->ptr(), cpu_buffer->ptr(), byte_size,
-                     base::MemcpyKind::kMemcpyCUDA2CPU);
+    cpu_alloc->memcpy(buffer_->ptr(), cpu_buffer->ptr(), byte_size,
+                      base::MemcpyKind::kMemcpyCUDA2CPU);
     this->buffer_ = cpu_buffer;
+  } else {
+    LOG(INFO) << "The device type of the tensor is already cuda.";
   }
 }
 
@@ -124,6 +121,12 @@ bool Tensor::assign(std::shared_ptr<base::Buffer> buffer) {
   if (!buffer) {
     LOG(ERROR) << "The buffer parameter in the assign function is null pointer!";
     return false;
+  }
+  if (buffer_) {
+    if (buffer_->device_type() != buffer->device_type()) {
+      LOG(ERROR)
+          << "The device type of the new buffer is different from the original one.";
+    }
   }
 
   size_t byte_size = this->byte_size();
@@ -205,6 +208,21 @@ void Tensor::reshape(const std::vector<int32_t>& dims) {
   }
   this->dims_ = dims;
   this->size_ = size;
+}
+
+std::shared_ptr<base::Buffer> Tensor::get_buffer() const {
+  return buffer_;
+}
+
+Tensor Tensor::clone() const {
+  Tensor new_tensor = *this;
+  size_t byte_size = this->byte_size();
+
+  auto allocator = buffer_->allocator();
+  CHECK_NE(allocator, nullptr);
+  new_tensor.buffer_ = std::make_shared<base::Buffer>(byte_size, allocator);
+  new_tensor.buffer_->copy_from(buffer_.get());
+  return new_tensor;
 }
 
 size_t Tensor::byte_size() const {

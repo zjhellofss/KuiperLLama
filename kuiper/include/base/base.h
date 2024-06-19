@@ -3,6 +3,11 @@
 #include <glog/logging.h>
 #include <cstdint>
 #include <string>
+#define UNUSED(expr) \
+  do {               \
+    (void)(expr);    \
+  } while (0)
+
 namespace base {
 enum class DeviceType : uint8_t {
   kDeviceUnknown = 0,

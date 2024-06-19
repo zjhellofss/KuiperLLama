@@ -1,5 +1,5 @@
 #include "op/matmul.h"
-#include "kernels/matmul_kernel.h"
+#include "kernels/cpu/matmul_kernel.h"
 namespace op {
 MatmulLayer::MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1)
     : LayerFp32Param(device_type, LayerType::kLayerMatmul, "Matmul"),

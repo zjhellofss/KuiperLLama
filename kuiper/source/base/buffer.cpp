@@ -56,6 +56,7 @@ std::shared_ptr<DeviceAllocator> Buffer::allocator() const {
 
 void Buffer::copy_from(const Buffer& buffer) const {
   CHECK(allocator_ != nullptr);
+  CHECK(buffer.ptr_ != nullptr);
 
   size_t byte_size = byte_size_ < buffer.byte_size_ ? byte_size_ : buffer.byte_size_;
   const DeviceType& buffer_device = buffer.device_type();
@@ -81,10 +82,9 @@ void Buffer::copy_from(const Buffer& buffer) const {
 }
 
 void Buffer::copy_from(const Buffer* buffer) const {
-  if (!buffer) {
-    return;
-  }
   CHECK(allocator_ != nullptr);
+  CHECK(buffer != nullptr || buffer->ptr_ != nullptr);
+
   size_t src_size = byte_size_;
   size_t dest_size = buffer->byte_size_;
   size_t byte_size = src_size < dest_size ? src_size : dest_size;

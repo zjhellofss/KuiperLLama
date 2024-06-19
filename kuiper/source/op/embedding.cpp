@@ -1,5 +1,5 @@
 #include "op/embedding.h"
-#include "kernels/emb_kernel.h"
+#include "kernels/cpu/emb_kernel.h"
 #include "op/layer.h"
 namespace op {
 EmbeddingLayer::EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_t seq_len,

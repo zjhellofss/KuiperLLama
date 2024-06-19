@@ -1,5 +1,6 @@
 #include "op/rmsnorm.h"
 #include <armadillo>
+#include "kernels/cpu/rmsnorm_kernel.h"
 namespace op {
 RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
     : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
@@ -13,19 +14,10 @@ base::Status RmsNormLayer::base_forward() {
   if (!status) {
     return status;
   }
-
-  float* in_ptr = get_input(0).ptr<float>();
-  float* wei_ptr = get_weight(0).ptr<float>();
-  float* out_ptr = get_output(0).ptr<float>();
-
-  arma::fvec in_tensor(in_ptr, dim_, false, true);
-  arma::fvec out_tensor(out_ptr, dim_, false, true);
-  arma::fvec wei_tensor(wei_ptr, dim_, false, true);
-
-  const float eps = 1e-5f;
-  const float mean = arma::as_scalar(arma::mean(arma::pow(in_tensor, 2))) + eps;
-  const float rsqrt = 1.f / std::sqrt(mean);
-  out_tensor = wei_tensor % (rsqrt * in_tensor);
+  auto input = this->get_input(0);
+  auto weight = this->get_weight(0);
+  auto output = this->get_output(0);
+  kernel::get_rmsnorm_kernel(device_type_)(dim_, input, weight, output);
   return base::error::Success();
 }
 

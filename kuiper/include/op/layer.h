@@ -149,6 +149,8 @@ class Layer : public BaseLayer {
 
   void reset_output_size(size_t size);
 
+  virtual void to_cuda();
+
  private:
   std::vector<tensor::Tensor> inputs_;
   std::vector<tensor::Tensor> outputs_;
@@ -166,6 +168,8 @@ class LayerFp32Param : public Layer {
   tensor::Tensor& get_weight(int32_t idx);
 
   const tensor::Tensor& get_weight(int32_t idx) const;
+
+  void to_cuda() override;
 
   void set_weight(int32_t idx, const tensor::Tensor& weight);
 

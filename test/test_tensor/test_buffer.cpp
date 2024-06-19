@@ -1,9 +1,8 @@
-#include <cuda_device_runtime_api.h>
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include "base/buffer.h"
-#include "test_cu.cuh"
+#include "../utils.cuh"
 
 TEST(test_buffer, allocate) {
   using namespace base;

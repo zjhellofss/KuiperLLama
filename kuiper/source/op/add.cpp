@@ -1,5 +1,5 @@
 #include "op/add.h"
-#include "kernels/add_kernel.h"
+#include "kernels/add_kernel_i.h"
 namespace op {
 VecAddLayer::VecAddLayer(base::DeviceType device_type)
     : Layer(device_type, LayerType::kLayerAdd, "Add") {
@@ -40,7 +40,7 @@ base::Status VecAddLayer::base_forward() {
   auto input1 = this->get_input(0);
   auto input2 = this->get_input(1);
   auto output = this->get_output(0);
-  kernel::get_add_kernel(device_type_)(input1, input2, output);
+  kernel::get_add_kernel(device_type_)(input1, input2, output, nullptr);
   return base::error::Success();
 }
 

@@ -9,12 +9,14 @@ aux_source_directory(kuiper/source/tensor/ DIR_TENSOR)
 aux_source_directory(kuiper/source/base/ DIR_BASE)
 aux_source_directory(kuiper/source/op/ DIR_OP)
 aux_source_directory(kuiper/source/model/ DIR_MODEL)
-aux_source_directory(kuiper/source/op/kernels DIR_KERNEL)
+aux_source_directory(kuiper/source/op/kernels/cpu DIR_KERNEL_CPU)
+aux_source_directory(kuiper/source/op/kernels/cuda DIR_KERNEL_CUDA)
+aux_source_directory(kuiper/source/op/kernels/ DIR_KERNEL)
 aux_source_directory(kuiper/source/sampler DIR_SAMPLE)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
-add_library(llama SHARED ${DIR_TENSOR} ${DIR_BASE} ${DIR_OP} ${DIR_MODEL} ${DIR_KERNEL} ${DIR_SAMPLE})
+add_library(llama SHARED ${DIR_TENSOR} ${DIR_BASE} ${DIR_OP} ${DIR_KERNEL} ${DIR_MODEL} ${DIR_KERNEL_CPU} ${DIR_KERNEL_CUDA} ${DIR_KERNEL} ${DIR_SAMPLE})
 target_link_libraries(llama sentencepiece glog::glog cudart ${ARMADILLO_LIBRARIES})
 target_link_directories(llama PUBLIC ${CMAKE_CUDA_COMPILER_LIBRARY_ROOT}/lib64)
 
