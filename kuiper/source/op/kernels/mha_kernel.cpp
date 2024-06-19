@@ -33,7 +33,6 @@ void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t 
     score_head_tensor.assign(score_head_buffer);
 
     get_softmax_kernel(base::DeviceType::kDeviceCPU)(score_head_tensor);
-
     arma::fvec output_head(const_cast<float*>(mha_out.ptr<float>()) + h * head_size,
                            head_size, false, true);
     for (int32_t t = 0; t <= pos; t++) {

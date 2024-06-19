@@ -14,9 +14,9 @@ void rope_kernel_cpu(int32_t dim, int32_t kv_dim, int32_t head_size,
     float fci = std::sin(val);
     int32_t rotn = i < kv_dim ? 2 : 1;  // how many vectors? 2 = q & k, 1 = q only
     for (int32_t v = 0; v < rotn; v++) {
-      float* vec =
-          (float*)(v == 0 ? input_q.ptr<float>()
-                          : input_k.ptr<float>());  // the vector to rotate (query or key)
+      float* vec = const_cast<float*>(
+          v == 0 ? input_q.ptr<float>()
+                 : input_k.ptr<float>());  // the vector to rotate (query or key)
       float v0 = vec[i];
       float v1 = vec[i + 1];
       vec[i] = v0 * fcr - v1 * fci;

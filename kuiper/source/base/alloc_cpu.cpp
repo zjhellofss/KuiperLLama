@@ -1,7 +1,6 @@
 #include <glog/logging.h>
 #include <cstdlib>
 #include "base/alloc.h"
-#include "cuda_runtime.h"
 
 #if (defined(_POSIX_ADVISORY_INFO) && (_POSIX_ADVISORY_INFO >= 200112L))
 #define KUIPER_HAVE_POSIX_MEMALIGN
@@ -35,15 +34,6 @@ void CPUDeviceAllocator::release(void* ptr) const {
   if (ptr) {
     free(ptr);
   }
-}
-
-void CPUDeviceAllocator::memcpy(const void* src_ptr, void* dest_ptr, size_t size) const {
-  CHECK_NE(src_ptr, nullptr);
-  CHECK_NE(dest_ptr, nullptr);
-  if (!size) {
-    return;
-  }
-  std::memcpy(dest_ptr, src_ptr, size);
 }
 
 std::shared_ptr<CPUDeviceAllocator> CPUDeviceAllocatorFactory::instance = nullptr;

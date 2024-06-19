@@ -23,3 +23,10 @@ void test_function(float* arr, int32_t size) {
   cudaMemcpy(arr, cu_arr, size * sizeof(float), cudaMemcpyDeviceToHost);
   cudaFree(cu_arr);
 }
+
+void set_value_cu(float* arr_cu, int32_t size) {
+  test_function_cu<<<1, size>>>(arr_cu, size);
+  cudaDeviceSynchronize();
+  const cudaError_t err = cudaGetLastError();
+  CHECK_EQ(err, cudaSuccess);
+}

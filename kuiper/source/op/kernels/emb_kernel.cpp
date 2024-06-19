@@ -16,7 +16,8 @@ void emb_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight,
       const void* src_ptr = (void*)weight.ptr<float>(token * weight_dim);
       CHECK(src_ptr != nullptr);
       CHECK(dest_ptr != nullptr);
-      allocator->memcpy(src_ptr, dest_ptr, weight_dim * sizeof(float));
+      allocator->memcpy(src_ptr, dest_ptr, weight_dim * sizeof(float),
+                        base::MemcpyKind::kMemcpyCPU2CPU);
     }
   }
 }

@@ -29,6 +29,10 @@ class Tensor {
 
   explicit Tensor(base::DataType data_type, std::vector<int32_t> dims);
 
+  void to_cpu();
+
+  void to_cuda();
+
   bool is_empty() const;
 
   template <typename T>
@@ -75,9 +79,6 @@ class Tensor {
 
   template <typename T>
   const T& index(int64_t offset) const;
-
-  template <typename T>
-  void transpose_dim12(Tensor dst);
 
  private:
   size_t size_ = 0;
@@ -126,36 +127,6 @@ const T* Tensor::ptr(int64_t index) const {
   CHECK(buffer_ != nullptr && buffer_->ptr() != nullptr)
       << "The data area buffer of this tensor is empty or it points to a null pointer.";
   return reinterpret_cast<const T*>(buffer_->ptr()) + index;
-}
-
-template <typename T>
-void Tensor::transpose_dim12(Tensor dst) {
-  CHECK_EQ(dims_size(), 3);
-  CHECK_EQ(is_empty(), false);
-  CHECK_EQ(dst.dims_size(), 3);
-  CHECK_EQ(dst.is_empty(), false);
-  CHECK_EQ(get_dim(0), dst.get_dim(0));
-  CHECK_EQ(get_dim(1), dst.get_dim(2));
-  CHECK_EQ(get_dim(2), dst.get_dim(1));
-  CHECK(device_type() == dst.device_type());
-  CHECK(device_type() == base::DeviceType::kDeviceCPU);
-
-  int32_t src_ch = this->get_dim(0);
-  int32_t src_row = this->get_dim(1);
-  int32_t src_col = this->get_dim(2);
-  int32_t dst_row = dst.get_dim(1);
-  int32_t dst_col = dst.get_dim(2);
-  int32_t plane_size = src_col * src_row;
-
-  T* src_ptr = this->ptr<T>();
-  T* dst_ptr = dst.ptr<T>();
-  for (int32_t ch = 0; ch < src_ch; ++ch) {
-    T* src_ch_ptr = src_ptr + ch * plane_size;
-    T* dst_ch_ptr = dst_ptr + ch * plane_size;
-    arma::Mat<T> src_mat = arma::Mat<T>(src_ch_ptr, src_col, src_row, false, true);
-    arma::Mat<T> dst_mat = arma::Mat<T>(dst_ch_ptr, dst_col, dst_row, false, true);
-    dst_mat = src_mat.t();
-  }
 }
 }  // namespace tensor
 #endif  // KUIPER_INCLUDE_TENSOR_TENSOR_H_

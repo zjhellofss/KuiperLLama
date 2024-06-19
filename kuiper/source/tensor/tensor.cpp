@@ -4,7 +4,7 @@
 
 namespace tensor {
 template <typename T, typename Tp>
-static inline size_t ReduceDimension(T begin, T end, Tp init) {
+static size_t ReduceDimension(T begin, T end, Tp init) {
   if (begin >= end) {
     return 0;
   }
@@ -62,6 +62,45 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
 Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
     : dims_(std::move(dims)), data_type_(data_type) {
   size_ = ReduceDimension(dims_.begin(), dims_.end(), 1);
+}
+
+void Tensor::to_cuda() {
+  CHECK_NE(buffer_, nullptr);
+  CHECK_NE(buffer_->allocator(), nullptr);
+  const base::DeviceType device_type = this->device_type();
+  if (device_type == base::DeviceType::kDeviceUnknown) {
+    LOG(ERROR) << "The device type of the tensor is unknown.";
+  }
+
+  if (device_type == base::DeviceType::kDeviceCPU) {
+    size_t byte_size = this->byte_size();
+    auto cpu_alloc = buffer_->allocator();
+    auto cu_alloc = base::CUDADeviceAllocatorFactory::get_instance();
+    auto cu_buffer = std::make_shared<base::Buffer>(byte_size, cu_alloc);
+    cu_alloc->memcpy(buffer_->ptr(), cu_buffer->ptr(), byte_size,
+                     base::MemcpyKind::kMemcpyCPU2CUDA);
+    this->buffer_ = cu_buffer;
+  }
+}
+
+void Tensor::to_cpu() {
+  CHECK_NE(buffer_, nullptr);
+  CHECK_NE(buffer_->allocator(), nullptr);
+  const base::DeviceType device_type = this->device_type();
+
+  if (device_type == base::DeviceType::kDeviceUnknown) {
+    LOG(ERROR) << "The device type of the tensor is unknown.";
+  }
+
+  if (device_type == base::DeviceType::kDeviceCUDA) {
+    size_t byte_size = this->byte_size();
+    auto cu_alloc = buffer_->allocator();
+    auto cpu_alloc = base::CPUDeviceAllocatorFactory::get_instance();
+    auto cpu_buffer = std::make_shared<base::Buffer>(byte_size, cpu_alloc);
+    cu_alloc->memcpy(buffer_->ptr(), cpu_buffer->ptr(), byte_size,
+                     base::MemcpyKind::kMemcpyCUDA2CPU);
+    this->buffer_ = cpu_buffer;
+  }
 }
 
 size_t Tensor::size() const {
