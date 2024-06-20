@@ -9,38 +9,35 @@ static __device__ __forceinline__ float warp_reduce_sum(float x) {
   return x;
 }
 
-template <int block_size>
 static __global__ void rms_norm_f32(const float* in, const float* wei, float* out,
                                     const int dim, const float eps) {
-  const int row = blockIdx.x * blockDim.y + threadIdx.y;
   const int tid = threadIdx.x;
-
-  float tmp = 0.0f;  // partial sum for thread in warp
-
+  const int block_size = blockDim.x;
+  float value = 0.0f;  // partial sum for thread in warp
   for (int i = tid; i < dim; i += block_size) {
-    const float xi = in[row * dim + i];
-    tmp += xi * xi;
+    const float xi = in[i];
+    value += xi * xi;
   }
 
   // sum up partial sums
-  tmp = warp_reduce_sum(tmp);
+  value = warp_reduce_sum(value);
   if (block_size > WARP_SIZE) {
-    __shared__ float s_sum[32];
+    __shared__ float shared_arr[WARP_SIZE];
     int warp_id = threadIdx.x / WARP_SIZE;
     int lane_id = threadIdx.x % WARP_SIZE;
     if (lane_id == 0) {
-      s_sum[warp_id] = tmp;
+      shared_arr[warp_id] = value;
     }
     __syncthreads();
-    tmp = s_sum[lane_id];
-    tmp = warp_reduce_sum(tmp);
+    value = shared_arr[lane_id];
+    value = warp_reduce_sum(value);
   }
 
-  const float mean = tmp / dim;
+  const float mean = value / static_cast<float>(dim);
   const float scale = rsqrtf(mean + eps);
 
   for (int i = tid; i < dim; i += block_size) {
-    out[row * dim + i] = scale * in[row * dim + i] * wei[row * dim + i];
+    out[i] = scale * in[i] * wei[i];
   }
 }
 
@@ -54,18 +51,21 @@ void rmsnorm_kernel_cu(int32_t dim, const tensor::Tensor& input,
   CHECK(input.device_type() == base::DeviceType::kDeviceCUDA &&
         weight.device_type() == base::DeviceType::kDeviceCUDA &&
         output.device_type() == base::DeviceType::kDeviceCUDA);
+
   const float eps = 1e-5f;
-  constexpr int32_t threads = 32;
-  int32_t blocks = (dim + threads - 1) / threads;
+  const int32_t blocks = 1;
+  int32_t threads = 32;
+  if (dim > 1024) {
+    threads = 1024;
+  }
   const float* in_ptr = input.ptr<float>();
   const float* wei_ptr = weight.ptr<float>();
   float* out_ptr = const_cast<float*>(output.ptr<float>());
   if (stream) {
     cudaStream_t stream_ = static_cast<CUstream_st*>(stream);
-    rms_norm_f32<threads>
-        <<<blocks, threads, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, dim, eps);
+    rms_norm_f32<<<blocks, threads, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, dim, eps);
   } else {
-    rms_norm_f32<threads><<<blocks, threads>>>(in_ptr, wei_ptr, out_ptr, dim, eps);
+    rms_norm_f32<<<blocks, threads>>>(in_ptr, wei_ptr, out_ptr, dim, eps);
   }
 }
 }  // namespace kernel
