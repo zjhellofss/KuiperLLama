@@ -4,7 +4,6 @@ include(cmake/cuda.cmake)
 
 find_package(glog REQUIRED)
 find_package(Armadillo REQUIRED)
-
 aux_source_directory(kuiper/source/tensor/ DIR_TENSOR)
 aux_source_directory(kuiper/source/base/ DIR_BASE)
 aux_source_directory(kuiper/source/op/ DIR_OP)

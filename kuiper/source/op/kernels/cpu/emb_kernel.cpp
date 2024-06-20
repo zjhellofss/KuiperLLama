@@ -4,6 +4,8 @@ namespace kernel {
 void emb_kernel_normal(const tensor::Tensor& input, const tensor::Tensor& weight,
                        const tensor::Tensor& output, int32_t vocab_size, void* stream) {
   UNUSED(stream);
+  CHECK(!input.is_empty());
+  CHECK(!weight.is_empty());
   const int32_t input_num = static_cast<int32_t>(input.size());
   const int32_t weight_dim = weight.get_dim(1);
   CHECK(weight.device_type() == output.device_type());
@@ -15,10 +17,8 @@ void emb_kernel_normal(const tensor::Tensor& input, const tensor::Tensor& weight
     if (token > vocab_size) {
       LOG(FATAL) << "Token index is greater than vocab size.";
     } else {
-      void* dest_ptr = (void*)output.ptr<float>(i * weight_dim);
-      const void* src_ptr = (void*)weight.ptr<float>(token * weight_dim);
-      CHECK(src_ptr != nullptr);
-      CHECK(dest_ptr != nullptr);
+      float* dest_ptr = const_cast<float*>(output.ptr<float>(i * weight_dim));
+      float* src_ptr = const_cast<float*>(weight.ptr<float>(token * weight_dim));
       if (weight.device_type() == base::DeviceType::kDeviceCPU) {
         allocator->memcpy(src_ptr, dest_ptr, weight_dim * sizeof(float),
                           base::MemcpyKind::kMemcpyCPU2CPU);

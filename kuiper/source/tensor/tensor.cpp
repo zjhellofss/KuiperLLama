@@ -219,7 +219,6 @@ Tensor Tensor::clone() const {
   size_t byte_size = this->byte_size();
 
   auto allocator = buffer_->allocator();
-  CHECK_NE(allocator, nullptr);
   new_tensor.buffer_ = std::make_shared<base::Buffer>(byte_size, allocator);
   new_tensor.buffer_->copy_from(buffer_.get());
   return new_tensor;

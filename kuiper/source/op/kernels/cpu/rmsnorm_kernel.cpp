@@ -1,7 +1,18 @@
 #include "rmsnorm_kernel.h"
 
+namespace kernel {
 void rmsnorm_kernel_cpu(int32_t dim, const tensor::Tensor& input,
-                        const tensor::Tensor& weight, const tensor::Tensor& output) {
+                        const tensor::Tensor& weight, const tensor::Tensor& output,
+                        void* stream) {
+  UNUSED(stream);
+  CHECK(!input.is_empty());
+  CHECK(!weight.is_empty());
+  CHECK(!output.is_empty());
+
+  CHECK(input.device_type() == base::DeviceType::kDeviceCPU &&
+        weight.device_type() == base::DeviceType::kDeviceCPU &&
+        output.device_type() == base::DeviceType::kDeviceCPU);
+
   const float* in_ptr = input.ptr<float>();
   const float* wei_ptr = weight.ptr<float>();
   const float* out_ptr = output.ptr<float>();
@@ -15,12 +26,4 @@ void rmsnorm_kernel_cpu(int32_t dim, const tensor::Tensor& input,
   const float rsqrt = 1.f / std::sqrt(mean);
   out_tensor = wei_tensor % (rsqrt * in_tensor);
 }
-
-kernel::RMSNormKernel kernel::get_rmsnorm_kernel(base::DeviceType device_type) {
-  if (device_type == base::DeviceType::kDeviceCPU) {
-    return rmsnorm_kernel_cpu;
-  } else {
-    LOG(FATAL) << "Unknown device type for get an rmsnorm kernel.";
-    return nullptr;
-  }
-}
+}  // namespace kernel

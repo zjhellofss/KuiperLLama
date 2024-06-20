@@ -1,6 +1,7 @@
 #include "op/rmsnorm.h"
 #include <armadillo>
 #include "kernels/cpu/rmsnorm_kernel.h"
+#include "kernels/rms_kernel_i.h"
 namespace op {
 RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
     : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
@@ -17,7 +18,7 @@ base::Status RmsNormLayer::base_forward() {
   auto input = this->get_input(0);
   auto weight = this->get_weight(0);
   auto output = this->get_output(0);
-  kernel::get_rmsnorm_kernel(device_type_)(dim_, input, weight, output);
+  kernel::get_rmsnorm_kernel(device_type_)(dim_, input, weight, output, nullptr);
   return base::error::Success();
 }
 
