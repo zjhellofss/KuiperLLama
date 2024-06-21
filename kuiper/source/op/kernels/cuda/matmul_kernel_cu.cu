@@ -23,7 +23,7 @@ void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
   }
   CHECK_EQ(N, input.get_dim(0));
 
-  CHECK(output.is_empty() == false);
+  CHECK(output.is_empty() == false && output.size() == M * K);
   CHECK(output.device_type() == base::DeviceType::kDeviceCUDA);
   float alpha = 1.f;
   float beta = 0.f;
