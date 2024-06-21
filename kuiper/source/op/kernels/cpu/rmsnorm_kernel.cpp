@@ -1,9 +1,8 @@
 #include "rmsnorm_kernel.h"
 
 namespace kernel {
-void rmsnorm_kernel_cpu(int32_t dim, const tensor::Tensor& input,
-                        const tensor::Tensor& weight, const tensor::Tensor& output,
-                        void* stream) {
+void rmsnorm_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight,
+                        const tensor::Tensor& output, void* stream) {
   UNUSED(stream);
   CHECK(!input.is_empty());
   CHECK(!weight.is_empty());
@@ -16,6 +15,7 @@ void rmsnorm_kernel_cpu(int32_t dim, const tensor::Tensor& input,
   const float* in_ptr = input.ptr<float>();
   const float* wei_ptr = weight.ptr<float>();
   const float* out_ptr = output.ptr<float>();
+  const int32_t dim = static_cast<int32_t>(input.size());
 
   arma::fvec in_tensor(const_cast<float*>(in_ptr), dim, false, true);
   arma::fvec out_tensor(const_cast<float*>(out_ptr), dim, false, true);

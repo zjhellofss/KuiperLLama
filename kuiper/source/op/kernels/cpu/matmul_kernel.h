@@ -3,9 +3,9 @@
 #include "base/base.h"
 #include "tensor/tensor.h"
 namespace kernel {
-typedef void (*MatMulKernel)(const tensor::Tensor& input, const tensor::Tensor& weight,
-                             const tensor::Tensor& output);
-
-MatMulKernel get_matmul_kernel(base::DeviceType device_type);
+struct BlasCudaConfig;
+void matmul_kernel_cpu(const tensor::Tensor& input, const tensor::Tensor& weight,
+                       const tensor::Tensor& output,
+                       const BlasCudaConfig* config = nullptr);
 }  // namespace kernel
 #endif  // LLAMA_INFER_MATMUL_KERNEL_H

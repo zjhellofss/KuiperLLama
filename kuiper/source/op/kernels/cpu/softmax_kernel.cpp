@@ -1,24 +1,19 @@
 #include "softmax_kernel.h"
+#include "../softmax_kernel_i.h"
 namespace kernel {
-void softmax_inplace_cpu(const tensor::Tensor& input) {
+void softmax_inplace_cpu(const tensor::Tensor& input, void* stream) {
   int32_t size = static_cast<int32_t>(input.size());
   const float* input_ptr = input.ptr<float>();
 
-  float max_value = *std::max(input_ptr, input_ptr + size);
+  float max_value = *std::max_element(input_ptr, input_ptr + size);
+  printf("max value cpu %f\n", max_value);
+
   arma::fvec input_mat(const_cast<float*>(input_ptr), size, false, true);
   input_mat = arma::exp(input_mat - max_value);
 
   float sum_value = arma::sum(input_mat);
+  printf("sum value cpu%f\n", sum_value);
   input_mat = input_mat / sum_value;
-}
-
-SoftmaxInplaceKernel get_softmax_kernel(base::DeviceType device_type) {
-  if (device_type == base::DeviceType::kDeviceCPU) {
-    return softmax_inplace_cpu;
-  } else {
-    LOG(FATAL) << "Unknown device type for get an softmax kernel.";
-    return nullptr;
-  }
 }
 
 void softmax_inplace_cpu(const float* input_ptr, size_t size) {

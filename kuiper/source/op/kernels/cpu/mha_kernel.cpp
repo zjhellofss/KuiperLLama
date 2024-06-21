@@ -1,5 +1,5 @@
 #include "mha_kernel.h"
-#include "softmax_kernel.h"
+#include "../softmax_kernel_i.h"
 namespace kernel {
 
 void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_len,
@@ -26,7 +26,7 @@ void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t 
     }
 
     arma::fmat key_mat(const_cast<float*>(key_tensor.ptr<float>()), head_size, pos + 1,
-                      false, true);
+                       false, true);
     arma::fmat query(const_cast<float*>(query_head_addr), 1, head_size, false, true);
     arma::fmat score(const_cast<float*>(score_head_addr), 1, pos + 1, false, true);
     score = (query * key_mat) / std::sqrt(static_cast<float>(head_size));
@@ -37,7 +37,7 @@ void mha_kernel_cpu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t 
     tensor::Tensor score_head_tensor(base::DataType::kDataTypeFp32, pos + 1);
     score_head_tensor.assign(score_head_buffer);
 
-    get_softmax_kernel(base::DeviceType::kDeviceCPU)(score_head_tensor);
+    get_softmax_kernel(base::DeviceType::kDeviceCPU)(score_head_tensor, nullptr);
     arma::fvec output_head(const_cast<float*>(mha_out.ptr<float>()) + h * head_size,
                            head_size, false, true);
     for (int32_t t = 0; t <= pos; t++) {

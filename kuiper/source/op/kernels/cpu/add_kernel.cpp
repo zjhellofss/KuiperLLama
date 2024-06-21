@@ -8,6 +8,9 @@ void add_kernel_cpu(const tensor::Tensor& input1, const tensor::Tensor& input2,
   CHECK_EQ(input1.is_empty(), false);
   CHECK_EQ(input2.is_empty(), false);
   CHECK_EQ(output.is_empty(), false);
+  CHECK(input1.device_type() == base::DeviceType::kDeviceCPU);
+  CHECK(input2.device_type() == base::DeviceType::kDeviceCPU);
+
   CHECK_EQ(input1.size(), input2.size());
   CHECK_EQ(input1.size(), output.size());
 

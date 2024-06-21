@@ -1,5 +1,6 @@
 #include "op/matmul.h"
 #include "kernels/cpu/matmul_kernel.h"
+#include "kernels/matmul_kernel_i.h"
 namespace op {
 MatmulLayer::MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1)
     : LayerFp32Param(device_type, LayerType::kLayerMatmul, "Matmul"),
@@ -36,7 +37,8 @@ base::Status MatmulLayer::base_forward() {
   if (!status) {
     return status;
   }
-  kernel::get_matmul_kernel(device_type_)(get_input(0), get_weight(0), get_output(0));
+  kernel::get_matmul_kernel(device_type_)(get_input(0), get_weight(0), get_output(0),
+                                          nullptr);
   return base::error::Success();
 }
 }  // namespace op

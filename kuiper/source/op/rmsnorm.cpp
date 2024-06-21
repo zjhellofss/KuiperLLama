@@ -18,7 +18,7 @@ base::Status RmsNormLayer::base_forward() {
   auto input = this->get_input(0);
   auto weight = this->get_weight(0);
   auto output = this->get_output(0);
-  kernel::get_rmsnorm_kernel(device_type_)(dim_, input, weight, output, nullptr);
+  kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, nullptr);
   return base::error::Success();
 }
 

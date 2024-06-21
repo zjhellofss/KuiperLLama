@@ -1,5 +1,6 @@
 #include "op/swiglu.h"
 #include "kernels/cpu/swiglu_kernel.h"
+#include "kernels/swiglu_kernel_i.h"
 #include "op/layer.h"
 namespace op {
 SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)
@@ -36,7 +37,7 @@ base::Status SwiGLULayer::base_forward() {
   auto input1 = this->get_input(0);
   auto input2 = this->get_input(1);
   auto output = this->get_output(0);
-  kernel::get_swiglu_kernel(base::DeviceType::kDeviceCPU)(input1, input2, output);
+  kernel::get_swiglu_kernel(base::DeviceType::kDeviceCPU)(input1, input2, output,nullptr);
   return base::error::Success();
 }
 
