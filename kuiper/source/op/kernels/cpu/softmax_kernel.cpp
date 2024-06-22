@@ -6,13 +6,11 @@ void softmax_inplace_cpu(const tensor::Tensor& input, void* stream) {
   const float* input_ptr = input.ptr<float>();
 
   float max_value = *std::max_element(input_ptr, input_ptr + size);
-  printf("max value cpu %f\n", max_value);
 
   arma::fvec input_mat(const_cast<float*>(input_ptr), size, false, true);
   input_mat = arma::exp(input_mat - max_value);
 
   float sum_value = arma::sum(input_mat);
-  printf("sum value cpu%f\n", sum_value);
   input_mat = input_mat / sum_value;
 }
 

@@ -23,7 +23,7 @@ base::Status RoPELayer::base_forward() {
   tensor::Tensor input_k = this->get_input(1);
   tensor::Tensor input_pos = this->get_input(2);
   kernel::get_rope_kernel(device_type_)(dim_, kv_dim_, head_size_, input_q, input_k,
-                                        input_pos);
+                                        input_pos, nullptr);
   return base::error::Success();
 }
 

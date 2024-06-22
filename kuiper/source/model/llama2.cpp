@@ -43,7 +43,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
     // set input and pos
     pos_tensor.index<int32_t>(0) = pos;
     tensor::Tensor input(base::DataType::kDataTypeFp32, config_->dim_);
-    fill_input(next, pos_tensor, tokens, input, embedding_output); // input decoder 的输入吗，这里做一个填充
+    fill_input(next, pos_tensor, tokens, input,
+               embedding_output);  // input decoder 的输入吗，这里做一个填充
 
     for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
       attention_rms(layer_idx, input);
@@ -58,7 +59,8 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
 
     cls_logits(input);
     const std::string& decode_str = post_processing(pos, next, tokens);
-    std::cout << next << " " << decode_str << "\n" << std::flush;
+    printf("%05d %s\n", next, decode_str.c_str());
+    fflush(stdout);
     if (next == eos) {
       break;
     }
@@ -414,9 +416,9 @@ void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
   if (pos < tokens.size()) {
     auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
     // prefill steps
-    // encode "Hi, this is "; 
+    // encode "Hi, this is ";
     // 4 * 1024
-    // 4 * 1024 embedding pos = 0, [0, 1023] 
+    // 4 * 1024 embedding pos = 0, [0, 1023]
     // pos = 1 [1024,2047]
     std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
         config_->dim_ * sizeof(float), nullptr,
@@ -429,7 +431,7 @@ void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
     auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
     auto input_token_num = tensor::Tensor(base::DataType::kDataTypeInt32, 1);
     // Hi, this is a
-    // next --> a 
+    // next --> a
     // a embedding [1024]
     CHECK_NE(next, -1) << "The next token is -1.";
     input_tokens.reshape({1});
@@ -441,7 +443,7 @@ void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
 
     std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
         config_->dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
-    input.assign(input_emb_buffer);// 1024
+    input.assign(input_emb_buffer);  // 1024
   }
   input.set_device_type(device_type_);
 }
@@ -464,10 +466,6 @@ void LLama2Model::attention_qkv(int32_t layer_idx,
   tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
   int32_t pos = pos_tensor.index<int32_t>(0);
   // wq wk wv @ input
-  // t = T, 
-  // [key1,key2,key3,..,key t-1] kv cache空间当中的
-  // [key t]
-  // [key1,key2, key t]
   const auto& [key, val] = slice_kv_cache(layer_idx, pos);
   // query
   const auto& query_layer = llama_layers_->wq_layers_.at(layer_idx);
@@ -585,7 +583,7 @@ void LLama2Model::cls_logits(const tensor::Tensor& input) const {
 std::string LLama2Model::post_processing(int32_t pos, int32_t& next,
                                          const std::vector<int32_t>& tokens) const {
   tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
-  const float* forward_logits = forward_output.ptr<float>(); // 1024 [0,0.31,...,0.998,0.1,]
+  const float* forward_logits = forward_output.ptr<float>();
   if (pos < tokens.size() - 1) {
     next = tokens[pos + 1];
   } else {
