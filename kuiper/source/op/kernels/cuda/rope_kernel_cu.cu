@@ -15,7 +15,7 @@ __global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
   float fcr = cosf(val);
   float fci = sinf(val);
   int rotn = idx < kv_dim ? 2 : 1;
-
+#pragma unroll
   for (int v = 0; v < rotn; v++) {
     float* vec = const_cast<float*>(v == 0 ? input_q : input_k);
     float v0 = vec[idx];
