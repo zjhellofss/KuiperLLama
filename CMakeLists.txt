@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(llama_infer CXX CUDA)
 include(cmake/cuda.cmake)
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CUDA_STANDARD_REQUIRED  ON)
+set(CMAKE_CUDA_STANDARD 17)
+
+
 find_package(GTest REQUIRED)
 find_package(glog REQUIRED)
 find_package(Armadillo REQUIRED)
