@@ -14,7 +14,6 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
                 const tensor::Tensor& value_cache_tensor,
                 const tensor::Tensor& key_tensor, base::DeviceType device_type,
                 void* stream) {
-  UNUSED(stream);
   int32_t layer_offset = layer_index * seq_len * kv_dim;
   for (int32_t h = 0; h < head_num; ++h) {
     float* score_head_addr = const_cast<float*>(score_tensor.ptr<float>() + h * seq_len);
