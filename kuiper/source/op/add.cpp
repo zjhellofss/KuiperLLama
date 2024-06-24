@@ -9,7 +9,7 @@ VecAddLayer::VecAddLayer(base::DeviceType device_type)
 
 base::Status VecAddLayer::check() const {
   tensor::Tensor input1 = this->get_input(0);
-  tensor::Tensor input2 = this->get_input(0);
+  tensor::Tensor input2 = this->get_input(1);
   int32_t size = input1.size();
   base::Status status;
   status = check_tensor_with_dim(input1, device_type_, data_type_, size);

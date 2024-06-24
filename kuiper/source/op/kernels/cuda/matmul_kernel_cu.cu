@@ -4,7 +4,8 @@
 #include "matmul_kernel_cu.cuh"
 namespace kernel {
 void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
-                      const tensor::Tensor& output, const BlasCudaConfig* config) {
+                      const tensor::Tensor& output, const float scale,
+                      const BlasCudaConfig* config) {
   CHECK(config != nullptr && config->handle != nullptr);
   cublasHandle_t handle = config->handle;
   if (config->stream) {
@@ -25,7 +26,7 @@ void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
 
   CHECK(output.is_empty() == false && output.size() == M * K);
   CHECK(output.device_type() == base::DeviceType::kDeviceCUDA);
-  float alpha = 1.f;
+  float alpha = scale;
   float beta = 0.f;
   auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
                             K,  // 矩阵B的列数

@@ -178,8 +178,6 @@ class LayerFp32Param : public Layer {
 
  private:
   std::vector<tensor::Tensor> weights_;
-  std::vector<tensor::Tensor> inputs_;
-  std::vector<tensor::Tensor> outputs_;
 };
 }  // namespace op
 #endif  // KUIPER_INCLUDE_OP_LAYER_H_

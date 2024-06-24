@@ -1,11 +1,10 @@
 #include "tensor/tensor.h"
-#include <device_atomic_functions.h>
 #include <glog/logging.h>
 #include <numeric>
 
 namespace tensor {
 template <typename T, typename Tp>
-static size_t ReduceDimension(T begin, T end, Tp init) {
+static size_t reduce_dimension(T begin, T end, Tp init) {
   if (begin >= end) {
     return 0;
   }
@@ -13,29 +12,63 @@ static size_t ReduceDimension(T begin, T end, Tp init) {
   return size;
 }
 
+static size_t data_type_size(base::DataType data_type) {
+  switch (data_type) {
+    case base::DataType::kDataTypeFp32: {
+      return 4;
+    }
+    case base::DataType::kDataTypeInt8: {
+      return 1;
+    }
+    case base::DataType::kDataTypeInt32: {
+      return 4;
+    }
+    default: {
+      LOG(FATAL) << "Unknown data type size for " << int(data_type);
+      return 0;
+    }
+  }
+}
+
 Tensor::Tensor(base::DataType data_type, int32_t dim0, bool need_alloc,
-               std::shared_ptr<base::DeviceAllocator> alloc)
+               std::shared_ptr<base::DeviceAllocator> alloc, void* ptr)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   size_ = dim0;
   if (need_alloc && alloc) {
     allocate(alloc);
+  } else {
+    if (ptr != nullptr) {
+      CHECK(need_alloc == false)
+          << "The need_alloc is is true when ptr parameter is not a null pointer.";
+      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+          data_type_size(data_type) * size_, nullptr, ptr, true);
+      this->buffer_ = buffer;
+    }
   }
 }
 
 Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_alloc,
-               std::shared_ptr<base::DeviceAllocator> alloc)
+               std::shared_ptr<base::DeviceAllocator> alloc, void* ptr)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
   size_ = dim0 * dim1;
   if (need_alloc && alloc) {
     allocate(alloc);
+  } else {
+    if (ptr != nullptr) {
+      CHECK(need_alloc == false)
+          << "The need_alloc is is true when ptr parameter is not a null pointer.";
+      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+          data_type_size(data_type) * size_, nullptr, ptr, true);
+      this->buffer_ = buffer;
+    }
   }
 }
 
 Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2,
-               bool need_alloc, std::shared_ptr<base::DeviceAllocator> alloc)
+               bool need_alloc, std::shared_ptr<base::DeviceAllocator> alloc, void* ptr)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
@@ -43,12 +76,20 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
   size_ = dim0 * dim1 * dim2;
   if (need_alloc && alloc) {
     allocate(alloc);
+  } else {
+    if (ptr != nullptr) {
+      CHECK(need_alloc == false)
+          << "The need_alloc is is true when ptr parameter is not a null pointer.";
+      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+          data_type_size(data_type) * size_, nullptr, ptr, true);
+      this->buffer_ = buffer;
+    }
   }
 }
 
 Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim2,
                int32_t dim3, bool need_alloc,
-               std::shared_ptr<base::DeviceAllocator> alloc)
+               std::shared_ptr<base::DeviceAllocator> alloc, void* ptr)
     : data_type_(data_type) {
   dims_.push_back(dim0);
   dims_.push_back(dim1);
@@ -57,12 +98,20 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
   size_ = dim0 * dim1 * dim2 * dim3;
   if (need_alloc && alloc) {
     allocate(alloc);
+  } else {
+    if (ptr != nullptr) {
+      CHECK(need_alloc == false)
+          << "The need_alloc is is true when ptr parameter is not a null pointer.";
+      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+          data_type_size(data_type) * size_, nullptr, ptr, true);
+      this->buffer_ = buffer;
+    }
   }
 }
 
 Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims)
     : dims_(std::move(dims)), data_type_(data_type) {
-  size_ = ReduceDimension(dims_.begin(), dims_.end(), 1);
+  size_ = reduce_dimension(dims_.begin(), dims_.end(), 1);
 }
 
 void Tensor::to_cuda() {
@@ -179,7 +228,7 @@ void Tensor::set_device_type(base::DeviceType device_type) {
 void Tensor::reset(base::DataType data_type, const std::vector<int32_t>& dims) {
   this->data_type_ = data_type;
   this->dims_ = dims;
-  this->size_ = ReduceDimension(dims.begin(), dims.end(), 1);
+  this->size_ = reduce_dimension(dims.begin(), dims.end(), 1);
   this->buffer_ = nullptr;
 }
 
@@ -192,7 +241,7 @@ base::DataType Tensor::data_type() const {
 }
 
 void Tensor::reshape(const std::vector<int32_t>& dims) {
-  size_t size = ReduceDimension(dims.begin(), dims.end(), 1);
+  size_t size = reduce_dimension(dims.begin(), dims.end(), 1);
   if (!buffer_) {
     this->dims_ = dims;
     this->size_ = size;
@@ -232,7 +281,7 @@ std::vector<size_t> Tensor::strides() const {
   std::vector<size_t> strides;
   if (!dims_.empty()) {
     for (int32_t i = 0; i < dims_.size() - 1; ++i) {
-      size_t stride = ReduceDimension(dims_.begin() + i + 1, dims_.end(), 1);
+      size_t stride = reduce_dimension(dims_.begin() + i + 1, dims_.end(), 1);
       strides.push_back(stride);
     }
     strides.push_back(1);

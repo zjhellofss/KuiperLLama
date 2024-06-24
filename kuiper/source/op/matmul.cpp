@@ -37,7 +37,7 @@ base::Status MatmulLayer::base_forward() {
   if (!status) {
     return status;
   }
-  kernel::get_matmul_kernel(device_type_)(get_input(0), get_weight(0), get_output(0),
+  kernel::get_matmul_kernel(device_type_)(get_input(0), get_weight(0), get_output(0), 1.f,
                                           nullptr);
   return base::error::Success();
 }

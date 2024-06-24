@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED  ON)
 set(CMAKE_CUDA_STANDARD 17)
 
-
 find_package(GTest REQUIRED)
 find_package(glog REQUIRED)
 find_package(Armadillo REQUIRED)

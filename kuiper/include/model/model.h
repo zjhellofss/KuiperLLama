@@ -14,7 +14,6 @@
 #include "sampler/argmax_sampler.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
-#include "config.h"
 
 namespace model {
 enum class ModelBufferType {
@@ -65,15 +64,14 @@ class Model {
 
   const std::string& model_path() const;
 
- protected:
   virtual tensor::Tensor& get_buffer(ModelBufferType buffer_idx);
 
   virtual const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const;
 
+ protected:
   virtual base::Status insert_buffer(ModelBufferType buffer_idx,
                                      const tensor::Tensor& tensor);
 
- protected:
   virtual base::Status read_model_file();
 
   virtual base::Status create_encode_layer();
