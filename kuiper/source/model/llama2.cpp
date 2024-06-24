@@ -55,8 +55,6 @@ base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_
       attention_mha(layer_idx, pos_tensor);
       // feed forward
       feed_forward(layer_idx, input);
-      float a = *input.ptr<float>(0);
-      int u = 5;
     }
 
     cls_logits(input);
