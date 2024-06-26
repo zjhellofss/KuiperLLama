@@ -27,6 +27,8 @@ class DeviceAllocator {
                       MemcpyKind memcpy_kind = MemcpyKind::kMemcpyCPU2CPU,
                       void* stream = nullptr) const;
 
+  virtual void memset_zero(void* ptr, size_t byte_size, void* stream);
+
  private:
   DeviceType device_type_ = DeviceType::kDeviceUnknown;
 };

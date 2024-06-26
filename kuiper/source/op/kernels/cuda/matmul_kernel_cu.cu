@@ -5,7 +5,7 @@
 namespace kernel {
 void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
                       const tensor::Tensor& output, const float scale,
-                      const BlasCudaConfig* config) {
+                      const CudaConfig* config) {
   CHECK(config != nullptr && config->handle != nullptr);
   cublasHandle_t handle = config->handle;
   if (config->stream) {

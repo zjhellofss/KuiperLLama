@@ -34,6 +34,7 @@ enum class ModelBufferType {
   kKeyStorage = 14,
 
   kForwardOutput = 15,
+  kForwardOutputCPU = 16,
 };
 
 struct RawModelData {

@@ -1,4 +1,5 @@
 #include "op/layer.h"
+#include <base/cuda_config.h>
 #include <glog/logging.h>
 #include <cstdarg>
 #include <numeric>
@@ -94,18 +95,12 @@ base::Status Layer::check_tensor_with_dim(const tensor::Tensor& tensor,
 void Layer::set_input(int32_t idx, const tensor::Tensor& input) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, inputs_.size());
-  if (!input.is_empty()) {
-    CHECK(input.device_type() == device_type_);
-  }
   this->inputs_.at(idx) = input;
 }
 
 void Layer::set_output(int32_t idx, const tensor::Tensor& output) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, outputs_.size());
-  if (!output.is_empty()) {
-    CHECK(output.device_type() == device_type_);
-  }
   this->outputs_.at(idx) = output;
 }
 
@@ -158,6 +153,14 @@ void Layer::to_cuda() {
   }
 }
 
+void Layer::set_cuda_config(std::shared_ptr<kernel::CudaConfig> config) {
+  this->cuda_config_ = config;
+}
+
+std::shared_ptr<kernel::CudaConfig> Layer::cuda_config() const {
+  return cuda_config_;
+}
+
 size_t Layer::input_size() const {
   return inputs_.size();
 }
@@ -199,7 +202,6 @@ void LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   CHECK_NE(weight_ptr, nullptr);
-  CHECK(device_type == device_type_);
 
   size_t size =
       std::accumulate(dims.begin(), dims.end(), sizeof(float), std::multiplies<>());

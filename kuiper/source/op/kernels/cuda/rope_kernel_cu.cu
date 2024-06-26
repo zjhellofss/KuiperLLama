@@ -4,7 +4,7 @@ __global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
                                     const float* input_q, const float* input_k) {
   int idx = threadIdx.x + blockDim.x * blockIdx.x;
   idx = idx * 2;
-  if (idx >= dim || idx + 1 >= dim) {
+  if (idx >= dim) {
     return;
   }
 

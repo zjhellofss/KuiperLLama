@@ -1,6 +1,6 @@
 #ifndef KUIPER_INCLUDE_MODEL_LLAMA_H_
 #define KUIPER_INCLUDE_MODEL_LLAMA_H_
-#include <map>
+#include <base/cuda_config.h>
 #include "model.h"
 #include "op/add.h"
 #include "op/embedding.h"
@@ -32,6 +32,8 @@ struct LLama2Layers {
   std::shared_ptr<op::MatmulLayer> cls_layer_;
 
   std::shared_ptr<op::EmbeddingLayer> embedding_layer_;
+
+  void to_cuda();
 };
 
 class LLama2Model : public Model {
@@ -76,6 +78,7 @@ class LLama2Model : public Model {
                               const std::vector<int32_t>& tokens) const override;
 
  private:
+  std::shared_ptr<kernel::CudaConfig> cuda_config_;
   std::unique_ptr<LLama2Layers> llama_layers_;
 };
 }  // namespace model

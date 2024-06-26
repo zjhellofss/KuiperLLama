@@ -30,6 +30,7 @@ target_include_directories(llama PUBLIC ${PROJECT_SOURCE_DIR}/kuiper/include)
 target_include_directories(llama PUBLIC ${Armadillo_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -g -G")
 
 add_subdirectory(test)
 add_subdirectory(demo)

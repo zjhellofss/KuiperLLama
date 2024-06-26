@@ -27,10 +27,14 @@ base::Status MultiHeadAttention::base_forward() {
   const tensor::Tensor& key_cache_tensor = this->get_input(2);
   const tensor::Tensor& value_cache_tensor = this->get_input(3);
   const tensor::Tensor& key_tensor = this->get_input(4);
-  kernel::get_mha_kernel(device_type_)(pos_, head_num_, layer_index_, seq_len_, kv_dim_,
-                                       kv_mul_, head_size_, mha_out, query_tensor,
-                                       score_tensor, key_cache_tensor, value_cache_tensor,
-                                       key_tensor, device_type_, nullptr);
+
+  if (device_type_ == base::DeviceType::kDeviceCUDA) {
+    CHECK(cuda_config_ != nullptr);
+  }
+  kernel::get_mha_kernel(base::DeviceType::kDeviceCPU)(
+      pos_, head_num_, layer_index_, seq_len_, kv_dim_, kv_mul_, head_size_, mha_out,
+      query_tensor, score_tensor, key_cache_tensor, value_cache_tensor, key_tensor,
+      device_type_, cuda_config_ ? cuda_config_.get() : nullptr);
   return base::error::Success();
 }
 
@@ -42,7 +46,11 @@ base::Status MultiHeadAttention::check() const {
   base::Status status;
   const int32_t input_tensor_num = 5;
   for (int32_t i = 0; i < input_tensor_num; ++i) {
-    status = check_tensor(get_input(i), device_type_, data_type_);
+    if (i == 1) {
+      status = check_tensor(get_input(i), base::DeviceType::kDeviceCUDA, data_type_);
+    } else {
+      status = check_tensor(get_input(i), device_type_, data_type_);
+    }
     if (!status) {
       LOG(ERROR) << "The input tensor " << std::to_string(i)
                  << " error in the matmul layer.";

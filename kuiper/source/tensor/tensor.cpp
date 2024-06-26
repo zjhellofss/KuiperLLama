@@ -41,9 +41,15 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, bool need_alloc,
     if (ptr != nullptr) {
       CHECK(need_alloc == false)
           << "The need_alloc is is true when ptr parameter is not a null pointer.";
-      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
-          data_type_size(data_type) * size_, nullptr, ptr, true);
-      this->buffer_ = buffer;
+      if (!alloc) {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, nullptr, ptr, true);
+        this->buffer_ = buffer;
+      } else {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, alloc, ptr, false);
+        this->buffer_ = buffer;
+      }
     }
   }
 }
@@ -60,9 +66,15 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_a
     if (ptr != nullptr) {
       CHECK(need_alloc == false)
           << "The need_alloc is is true when ptr parameter is not a null pointer.";
-      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
-          data_type_size(data_type) * size_, nullptr, ptr, true);
-      this->buffer_ = buffer;
+      if (!alloc) {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, nullptr, ptr, true);
+        this->buffer_ = buffer;
+      } else {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, alloc, ptr, false);
+        this->buffer_ = buffer;
+      }
     }
   }
 }
@@ -80,9 +92,15 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
     if (ptr != nullptr) {
       CHECK(need_alloc == false)
           << "The need_alloc is is true when ptr parameter is not a null pointer.";
-      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
-          data_type_size(data_type) * size_, nullptr, ptr, true);
-      this->buffer_ = buffer;
+      if (!alloc) {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, nullptr, ptr, true);
+        this->buffer_ = buffer;
+      } else {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, alloc, ptr, false);
+        this->buffer_ = buffer;
+      }
     }
   }
 }
@@ -102,9 +120,15 @@ Tensor::Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, int32_t dim
     if (ptr != nullptr) {
       CHECK(need_alloc == false)
           << "The need_alloc is is true when ptr parameter is not a null pointer.";
-      std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
-          data_type_size(data_type) * size_, nullptr, ptr, true);
-      this->buffer_ = buffer;
+      if (!alloc) {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, nullptr, ptr, true);
+        this->buffer_ = buffer;
+      } else {
+        std::shared_ptr<base::Buffer> buffer = std::make_shared<base::Buffer>(
+            data_type_size(data_type) * size_, alloc, ptr, false);
+        this->buffer_ = buffer;
+      }
     }
   }
 }

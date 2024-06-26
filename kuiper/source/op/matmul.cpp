@@ -37,8 +37,12 @@ base::Status MatmulLayer::base_forward() {
   if (!status) {
     return status;
   }
+  if (device_type_ == base::DeviceType::kDeviceCPU) {
+    CHECK(cuda_config_ != nullptr);
+  }
   kernel::get_matmul_kernel(device_type_)(get_input(0), get_weight(0), get_output(0), 1.f,
-                                          nullptr);
+                                          cuda_config_ ? cuda_config_.get() : nullptr);
   return base::error::Success();
 }
+
 }  // namespace op

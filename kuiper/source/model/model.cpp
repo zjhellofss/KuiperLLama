@@ -181,11 +181,6 @@ base::Status Model::gen_model_from_file() {
     return create_encode_status;
   }
   // mmap
-  // file -->内核 ——》用户空间
-  // read_file(file,32)
-  // open file--> mmap --> mem ptr pointer 
-  // 访问文件第1024个字节的内容 float value = *(ptr pointer + 1024) 
-  // 一个page  
   auto mmap_status = read_model_file();
   if (!mmap_status) {
     LOG(ERROR) << "Handle model file " << model_path_ << " failed!";

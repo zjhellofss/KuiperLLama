@@ -1,4 +1,5 @@
 #include "op/rmsnorm.h"
+#include <cuda_runtime_api.h>
 #include <armadillo>
 #include "kernels/cpu/rmsnorm_kernel.h"
 #include "kernels/rms_kernel_i.h"
@@ -18,7 +19,11 @@ base::Status RmsNormLayer::base_forward() {
   auto input = this->get_input(0);
   auto weight = this->get_weight(0);
   auto output = this->get_output(0);
-  kernel::get_rmsnorm_kernel(device_type_)(input, weight, output, nullptr);
+  if (device_type_ == base::DeviceType::kDeviceCUDA) {
+    CHECK(cuda_config_ != nullptr);
+  }
+  kernel::get_rmsnorm_kernel(device_type_)(input, weight, output,
+                                           cuda_config_ ? cuda_config_->stream : nullptr);
   return base::error::Success();
 }
 

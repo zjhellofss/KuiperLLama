@@ -1,37 +1,26 @@
 #include "softmax_kernel_cu.cuh"
 #include "utils.cuh"
 namespace kernel {
+__global__ void row_softmax_fp32(const float* in, int size) {
+  const int tid = threadIdx.x;
+  const int lane_id = tid % warpSize;
+  const float* x = in;
+  float* y = const_cast<float*>(in);
 
-template <const int NUM_THREADS = 128>
-__global__ void row_softmax_fp32(float* in, int size) {
-  int tid = threadIdx.x;
-  if (tid > size) {
-    return;
+  float maxval = -INFINITY;
+  for (int i = lane_id; i < size; i += warpSize) {
+    maxval = fmaxf(maxval, x[i]);
   }
-  extern __shared__ float shared_mem[];
+  maxval = warp_reduce_max(maxval);
 
-  // get the max value
-  float max_value = -INFINITY;
-  for (int i = tid; i < size; i += NUM_THREADS) {
-    const float xi = in[i];
-    shared_mem[i] = xi;
-    max_value = max(xi, max_value);
+  float sum = 0.0f;
+  for (int i = lane_id; i < size; i += warpSize) {
+    sum += expf(x[i] - maxval);
   }
-  max_value = block_reduce_max<NUM_THREADS>(max_value);
 
-  // get the sum value
-  float sum_value = 0.f;
-  for (int i = tid; i < size; i += NUM_THREADS) {
-    const float xi = exp(shared_mem[i] - max_value);
-    shared_mem[i] = xi;
-    sum_value += xi;
-  }
-  sum_value = block_reduce_sum<NUM_THREADS>(sum_value);
-
-  // write back
-  for (int i = tid; i < size; i += NUM_THREADS) {
-    const float out = shared_mem[i] / sum_value;
-    in[i] = out;
+  sum = warp_reduce_sum(sum);
+  for (int i = lane_id; i < size; i += warpSize) {
+    y[i] = expf(x[i] - maxval) / sum;
   }
 }
 
@@ -39,21 +28,22 @@ void softmax_inplace_kernel_cu(const tensor::Tensor& input, void* stream) {
   CHECK_EQ(input.is_empty(), false);
   CHECK(input.device_type() == base::DeviceType::kDeviceCUDA);
   int32_t size = static_cast<int32_t>(input.size());
-  const size_t shmem = (KUIPER_PAD(size, WARP_SIZE) + WARP_SIZE) * sizeof(float);
   if (size < 1024) {
     constexpr int threads_num = 128;
     if (stream) {
       cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
-      row_softmax_fp32<threads_num><<<1, threads_num, shmem, stream_>>>(
-          const_cast<float*>(input.ptr<float>()), size);
+      row_softmax_fp32<<<1, threads_num, 0, stream_>>>(input.ptr<float>(), size);
     } else {
-      row_softmax_fp32<threads_num>
-          <<<1, threads_num, shmem>>>(const_cast<float*>(input.ptr<float>()), size);
+      row_softmax_fp32<<<1, threads_num>>>(const_cast<float*>(input.ptr<float>()), size);
     }
   } else {
     constexpr int threads_num = 1024;
-    row_softmax_fp32<threads_num>
-        <<<1, threads_num, shmem>>>(const_cast<float*>(input.ptr<float>()), size);
+    if (stream) {
+      cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
+      row_softmax_fp32<<<1, threads_num, 0, stream_>>>(input.ptr<float>(), size);
+    } else {
+      row_softmax_fp32<<<1, threads_num>>>(input.ptr<float>(), size);
+    }
   }
 }
 }  // namespace kernel

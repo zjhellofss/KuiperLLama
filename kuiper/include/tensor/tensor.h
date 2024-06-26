@@ -10,6 +10,9 @@ namespace tensor {
 
 class Tensor {
  public:
+  ~Tensor() {
+    int u = 3;
+  }
   explicit Tensor() = default;
 
   explicit Tensor(base::DataType data_type, int32_t dim0, bool need_alloc = false,

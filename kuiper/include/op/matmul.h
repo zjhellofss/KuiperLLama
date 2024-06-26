@@ -4,6 +4,7 @@
 
 #ifndef KUIPER_INCLUDE_OP_MATMUL_H_
 #define KUIPER_INCLUDE_OP_MATMUL_H_
+#include <base/cuda_config.h>
 #include "layer.h"
 namespace op {
 class MatmulLayer : public LayerFp32Param {

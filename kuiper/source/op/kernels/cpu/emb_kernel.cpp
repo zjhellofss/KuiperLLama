@@ -1,4 +1,5 @@
 #include "emb_kernel.h"
+#include <cuda_runtime_api.h>
 namespace kernel {
 
 void emb_kernel_normal(const tensor::Tensor& input, const tensor::Tensor& weight,
