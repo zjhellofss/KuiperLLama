@@ -2,7 +2,7 @@ find_package(GTest REQUIRED)
 find_package(glog REQUIRED)
 
 set(link_ext_lib glog::glog GTest::gtest)
-add_executable(test_llm test_main.cpp test_buffer.cpp test_math.cpp)
+add_executable(test_llm test_main.cpp test_buffer.cpp test_add.cpp test_math.cpp)
 
 target_link_libraries(test_llm ${link_ext_lib})
 target_include_directories(test_llm PUBLIC ${glog_INCLUDE_DIR})
