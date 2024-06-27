@@ -1,4 +1,4 @@
-#include "add_kernel_cu.cuh"
+#include "add_kernel.cuh"
 namespace kernel {
 __global__ void add_kernel_cu_fp32(int32_t size, float scale1, const float* in1,
                                    float scale2, const float* in2, float* out) {

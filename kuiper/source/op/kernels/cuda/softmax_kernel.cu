@@ -1,4 +1,4 @@
-#include "softmax_kernel_cu.cuh"
+#include "softmax_kernel.cuh"
 #include "utils.cuh"
 namespace kernel {
 __global__ void row_softmax_fp32(const float* in, int size) {

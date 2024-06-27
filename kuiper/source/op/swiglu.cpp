@@ -1,6 +1,6 @@
 #include "op/swiglu.h"
 #include "kernels/cpu/swiglu_kernel.h"
-#include "kernels/swiglu_kernel_i.h"
+#include "kernels/kernels_interface.h"
 #include "op/layer.h"
 namespace op {
 SwiGLULayer::SwiGLULayer(base::DeviceType device_type, int32_t hidden_dim)

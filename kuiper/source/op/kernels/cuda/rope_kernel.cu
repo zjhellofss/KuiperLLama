@@ -1,4 +1,4 @@
-#include "rope_kernel_cu.cuh"
+#include "rope_kernel.cuh"
 namespace kernel {
 __global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
                                     const float* input_q, const float* input_k) {

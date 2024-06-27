@@ -1,4 +1,4 @@
-#include "scale_kernel_cu.cuh"
+#include "scale_kernel.cuh"
 namespace kernel {
 static __global__ void scale_inplace_fp32(float scale, float* ptr, int32_t size) {
   int32_t idx = threadIdx.x + blockDim.x * blockIdx.x;

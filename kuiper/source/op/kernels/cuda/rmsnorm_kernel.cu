@@ -1,4 +1,4 @@
-#include "rmsnorm_kernel_cu.cuh"
+#include "rmsnorm_kernel.cuh"
 #include "utils.cuh"
 #define WARP_SIZE 32
 namespace kernel {

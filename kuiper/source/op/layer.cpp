@@ -154,6 +154,9 @@ void Layer::to_cuda() {
 }
 
 void Layer::set_cuda_config(std::shared_ptr<kernel::CudaConfig> config) {
+  if (!config) {
+    return;
+  }
   this->cuda_config_ = config;
 }
 

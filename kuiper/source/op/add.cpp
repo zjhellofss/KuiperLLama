@@ -1,5 +1,5 @@
 #include "op/add.h"
-#include "kernels/add_kernel_i.h"
+#include "kernels/kernels_interface.h"
 namespace op {
 VecAddLayer::VecAddLayer(base::DeviceType device_type)
     : Layer(device_type, LayerType::kLayerAdd, "Add") {

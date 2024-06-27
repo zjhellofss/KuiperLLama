@@ -78,6 +78,8 @@ class Status {
 
   operator bool() const;
 
+  int32_t get_err_code() const;
+
   const std::string& get_err_msg() const;
 
   void set_err_msg(const std::string& err_msg);

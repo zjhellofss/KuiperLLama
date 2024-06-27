@@ -1,6 +1,6 @@
 #include "op/matmul.h"
 #include "kernels/cpu/matmul_kernel.h"
-#include "kernels/matmul_kernel_i.h"
+#include "kernels/kernels_interface.h"
 namespace op {
 MatmulLayer::MatmulLayer(base::DeviceType device_type, int32_t dim0, int32_t dim1)
     : LayerFp32Param(device_type, LayerType::kLayerMatmul, "Matmul"),
@@ -37,7 +37,7 @@ base::Status MatmulLayer::base_forward() {
   if (!status) {
     return status;
   }
-  if (device_type_ == base::DeviceType::kDeviceCPU) {
+  if (device_type_ == base::DeviceType::kDeviceCUDA) {
     CHECK(cuda_config_ != nullptr);
   }
   kernel::get_matmul_kernel(device_type_)(get_input(0), get_weight(0), get_output(0), 1.f,

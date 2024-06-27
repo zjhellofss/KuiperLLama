@@ -1,9 +1,8 @@
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include "../../kuiper/source/op/kernels/swiglu_kernel_i.h"
+#include "../source/op/kernels/kernels_interface.h"
 #include "base/buffer.h"
-
 TEST(test_swiglu_cu, swiglu_nostream) {
   auto alloc_cu = base::CUDADeviceAllocatorFactory::get_instance();
   auto alloc_cpu = base::CPUDeviceAllocatorFactory::get_instance();

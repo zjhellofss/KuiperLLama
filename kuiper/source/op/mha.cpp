@@ -1,6 +1,6 @@
 #include "op/mha.h"
 #include "kernels/cpu/mha_kernel.h"
-#include "kernels/mha_kernel_i.h"
+#include "kernels/kernels_interface.h"
 namespace op {
 MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t layer_index,
                                        int32_t kv_mul, int32_t kv_dim, int32_t seq_len,
@@ -47,6 +47,7 @@ base::Status MultiHeadAttention::check() const {
   const int32_t input_tensor_num = 5;
   for (int32_t i = 0; i < input_tensor_num; ++i) {
     if (i == 1) {
+      // mha score tensor
       status = check_tensor(get_input(i), base::DeviceType::kDeviceCUDA, data_type_);
     } else {
       status = check_tensor(get_input(i), device_type_, data_type_);

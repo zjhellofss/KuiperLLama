@@ -94,9 +94,14 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
 
   device_type_ = device_type;
   if (device_type == base::DeviceType::kDeviceCUDA) {
+    cudaSetDevice(0);
     cuda_config_ = std::make_shared<kernel::CudaConfig>();
     cudaStreamCreate(&cuda_config_->stream);
     cublasCreate(&cuda_config_->handle);
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      return error::InternalError("The cuda hanle create failed.");
+    }
   }
 
   Status read_status = gen_model_from_file();
@@ -342,7 +347,7 @@ void LLama2Model::init_mem() {
   std::shared_ptr<base::DeviceAllocator> alloc_cpu =
       base::CPUDeviceAllocatorFactory::get_instance();
   std::shared_ptr<base::DeviceAllocator> alloc_cu =
-    base::CUDADeviceAllocatorFactory::get_instance();
+      base::CUDADeviceAllocatorFactory::get_instance();
   int32_t max_seq_len = config_->seq_len_;
   tensor::Tensor input_tokens(base::DataType::kDataTypeInt32,
                               static_cast<int32_t>(max_seq_len), true, alloc_cpu);

@@ -1,7 +1,7 @@
 #include <cublas_v2.h>
 #include <tensor/tensor.h>
-#include "../matmul_kernel_i.h"
-#include "matmul_kernel_cu.cuh"
+#include "../kernels_interface.h"
+#include "matmul_kernel.cuh"
 namespace kernel {
 void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
                       const tensor::Tensor& output, const float scale,

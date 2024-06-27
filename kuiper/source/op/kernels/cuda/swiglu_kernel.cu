@@ -1,5 +1,5 @@
 #include <tensor/tensor.h>
-#include "swiglu_kernel_cu.cuh"
+#include "swiglu_kernel.cuh"
 #include "utils.cuh"
 namespace kernel {
 __global__ void swiglu_kernel_cu_fp32(int size, const float* in1, const float* in2,
@@ -34,8 +34,7 @@ void swiglu_kernel_cu(const tensor::Tensor& input1, const tensor::Tensor& input2
   CHECK(output.device_type() == base::DeviceType::kDeviceCUDA);
 
   int size = static_cast<int32_t>(input1.size());
-
-  int threads = 512;
+  int threads = 128;
   int blocks = (size + threads - 1) / threads;
   const size_t shmem = (KUIPER_PAD(size, WARP_SIZE) + WARP_SIZE) * sizeof(float) * 2;
   if (!stream) {

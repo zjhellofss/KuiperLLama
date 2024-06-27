@@ -1,11 +1,9 @@
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include "../../kuiper/source/op/kernels/softmax_kernel_i.h"
-#include "../source/op/kernels/rms_kernel_i.h"
+#include "../source/op/kernels/kernels_interface.h"
 #include "../utils.cuh"
 #include "base/buffer.h"
-
 TEST(test_softmax_cu, softmax_nostream) {
   auto alloc_cu = base::CUDADeviceAllocatorFactory::get_instance();
   auto alloc_cpu = base::CPUDeviceAllocatorFactory::get_instance();

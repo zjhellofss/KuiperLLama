@@ -1,10 +1,7 @@
 #include "../cpu/mha_kernel.h"
 #include <cuda_runtime_api.h>
-#include "../add_kernel_i.h"
-#include "../matmul_kernel_i.h"
-#include "../softmax_kernel_i.h"
+#include "../kernels_interface.h"
 namespace kernel {
-
 void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_len,
                 int32_t kv_dim, int32_t kv_mul, int32_t head_size,
                 const tensor::Tensor& mha_out, const tensor::Tensor& query_tensor,
@@ -38,8 +35,7 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
         allocator->memcpy(key_head_addr,
                           const_cast<float*>(key_tensor.ptr<float>(t * head_size)),
                           head_size * sizeof(float), base::MemcpyKind::kMemcpyCUDA2CUDA,
-                          config ? config->stream : nullptr);
-        cudaDeviceSynchronize();
+                          config ? config->stream : nullptr, true);
       }
     }
 
@@ -66,11 +62,9 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
 
     float* output_head_ptr = const_cast<float*>(mha_out.ptr<float>()) + h * head_size;
     allocator->memset_zero(output_head_ptr, sizeof(float) * head_size,
-                           config ? config->stream : nullptr);
-    cudaDeviceSynchronize();
-    tensor::Tensor output_tensor(
-        base::DataType::kDataTypeFp32, head_size, false, nullptr,
-        const_cast<float*>(mha_out.ptr<float>()) + h * head_size);
+                           config ? config->stream : nullptr, true);
+    tensor::Tensor output_tensor(base::DataType::kDataTypeFp32, head_size, false, nullptr,
+                                 output_head_ptr);
     output_tensor.set_device_type(device_type);
 
     for (int32_t t = 0; t <= pos; t++) {

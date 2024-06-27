@@ -1,5 +1,5 @@
 #include "sampler/mult_sampler.h"
-#include "../op/kernels/softmax_kernel_i.h"
+#include "../op/kernels/kernels_interface.h"
 namespace sampler {
 int32_t MultSampler::sample(const float* logits, int32_t size) {
   kernel::softmax_inplace_cpu(logits, size);

@@ -1,7 +1,7 @@
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include "../source/op/kernels/emb_kernel_i.h"
+#include "../source/op/kernels/kernels_interface.h"
 #include "base/buffer.h"
 TEST(test_emb_cu, emb1_nostream) {
   auto alloc_cu = base::CUDADeviceAllocatorFactory::get_instance();

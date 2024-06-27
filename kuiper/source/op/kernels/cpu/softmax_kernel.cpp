@@ -1,5 +1,5 @@
 #include "softmax_kernel.h"
-#include "../softmax_kernel_i.h"
+#include "../kernels_interface.h"
 namespace kernel {
 void softmax_inplace_cpu(const tensor::Tensor& input, void* stream) {
   int32_t size = static_cast<int32_t>(input.size());

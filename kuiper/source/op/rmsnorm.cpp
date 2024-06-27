@@ -2,7 +2,7 @@
 #include <cuda_runtime_api.h>
 #include <armadillo>
 #include "kernels/cpu/rmsnorm_kernel.h"
-#include "kernels/rms_kernel_i.h"
+#include "kernels/kernels_interface.h"
 namespace op {
 RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
     : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
