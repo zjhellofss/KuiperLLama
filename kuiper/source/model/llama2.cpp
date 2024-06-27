@@ -2,7 +2,6 @@
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 #include <sentencepiece_processor.h>
-#include <array>
 #include <utility>
 #include "base/tick.h"
 #include "sampler/mult_sampler.h"
@@ -94,9 +93,11 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   }
 
   device_type_ = device_type;
-  cuda_config_ = std::make_shared<kernel::CudaConfig>();
-  cudaStreamCreate(&cuda_config_->stream);
-  cublasCreate(&cuda_config_->handle);
+  if (device_type == base::DeviceType::kDeviceCUDA) {
+    cuda_config_ = std::make_shared<kernel::CudaConfig>();
+    cudaStreamCreate(&cuda_config_->stream);
+    cublasCreate(&cuda_config_->handle);
+  }
 
   Status read_status = gen_model_from_file();
   if (!read_status) {
