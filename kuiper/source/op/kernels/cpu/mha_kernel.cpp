@@ -22,38 +22,49 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
     } else {
       allocator = base::CUDADeviceAllocatorFactory::get_instance();
     }
-    for (int32_t t = 0; t <= pos; t++) {
-      int32_t cache_offset = t * kv_dim + (h / kv_mul) * head_size;
-      const float* key_head_addr =
-          key_cache_tensor.ptr<float>() + layer_offset + cache_offset;
-      // key tensor: pos + 1 , head_size
-      if (device_type == base::DeviceType::kDeviceCPU) {
+    if (device_type == base::DeviceType::kDeviceCPU) {
+      for (int32_t t = 0; t <= pos; t++) {
+        int32_t cache_offset = t * kv_dim + (h / kv_mul) * head_size;
+        const float* key_head_addr =
+            key_cache_tensor.ptr<float>() + layer_offset + cache_offset;
+        // key tensor: pos + 1 , head_size
         allocator->memcpy(key_head_addr,
                           const_cast<float*>(key_tensor.ptr<float>(t * head_size)),
                           head_size * sizeof(float), base::MemcpyKind::kMemcpyCPU2CPU);
-      } else {
-        allocator->memcpy(key_head_addr,
-                          const_cast<float*>(key_tensor.ptr<float>(t * head_size)),
-                          head_size * sizeof(float), base::MemcpyKind::kMemcpyCUDA2CUDA,
-                          config ? config->stream : nullptr, true);
+      }
+      tensor::Tensor key_mat(base::DataType::kDataTypeFp32, pos + 1, head_size, false,
+                             nullptr, const_cast<float*>(key_tensor.ptr<float>()));
+      tensor::Tensor query_mat(base::DataType::kDataTypeFp32, head_size, false, nullptr,
+                               query_head_addr);
+      tensor::Tensor score_mat(base::DataType::kDataTypeFp32, pos + 1, false, nullptr,
+                               score_head_addr);
+      key_mat.set_device_type(device_type);
+      query_mat.set_device_type(device_type);
+      score_mat.set_device_type(device_type);
+
+      float scale = 1.f / std::sqrt(static_cast<float>(head_size));
+      get_matmul_kernel(device_type)(query_mat, key_mat, score_mat, scale, config);
+    } else {
+      for (int32_t t = 0; t <= pos; t++) {
+        int32_t cache_offset = t * kv_dim + (h / kv_mul) * head_size;
+        const float* key_head_addr =
+            key_cache_tensor.ptr<float>() + layer_offset + cache_offset;
+        tensor::Tensor key_mat(base::DataType::kDataTypeFp32, 1, head_size, false,
+                               nullptr, const_cast<float*>(key_head_addr));
+        tensor::Tensor query_mat(base::DataType::kDataTypeFp32, head_size, false, nullptr,
+                                 query_head_addr);
+        tensor::Tensor score_mat(base::DataType::kDataTypeFp32, 1, false, nullptr,
+                                 score_head_addr + t);
+        key_mat.set_device_type(device_type);
+        query_mat.set_device_type(device_type);
+        score_mat.set_device_type(device_type);
+        float scale = 1.f / std::sqrt(static_cast<float>(head_size));
+        get_matmul_kernel(device_type)(query_mat, key_mat, score_mat, scale, config);
       }
     }
 
-    tensor::Tensor key_mat(base::DataType::kDataTypeFp32, pos + 1, head_size, false,
-                           nullptr, const_cast<float*>(key_tensor.ptr<float>()));
-    tensor::Tensor query_mat(base::DataType::kDataTypeFp32, head_size, false, nullptr,
-                             (float*)query_head_addr);
-    tensor::Tensor score_mat(base::DataType::kDataTypeFp32, pos + 1, false, nullptr,
-                             score_head_addr);
-    key_mat.set_device_type(device_type);
-    query_mat.set_device_type(device_type);
-    score_mat.set_device_type(device_type);
-
-    float scale = 1.f / std::sqrt(static_cast<float>(head_size));
-    get_matmul_kernel(device_type)(query_mat, key_mat, score_mat, scale, config);
-
     auto score_head_buffer = std::make_shared<base::Buffer>(
-        (pos + 1) * sizeof(float), nullptr, const_cast<float*>(score_head_addr), true);
+        (pos + 1) * sizeof(float), nullptr, score_head_addr, true);
     score_head_buffer->set_device_type(device_type);
     tensor::Tensor score_head_tensor(base::DataType::kDataTypeFp32, pos + 1);
     score_head_tensor.assign(score_head_buffer);
