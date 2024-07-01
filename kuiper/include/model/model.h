@@ -31,8 +31,6 @@ enum class ModelBufferType {
   kW2Output = 11,
   kW3Output = 12,
   kFFNRMSNorm = 13,
-  kKeyStorage = 14,
-
   kForwardOutput = 15,
   kForwardOutputCPU = 16,
 };

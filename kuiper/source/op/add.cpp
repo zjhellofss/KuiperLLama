@@ -43,7 +43,7 @@ base::Status VecAddLayer::base_forward() {
   if (device_type_ == base::DeviceType::kDeviceCUDA) {
     CHECK(cuda_config_ != nullptr);
   }
-  kernel::get_add_kernel(device_type_)(1.f, input1, 1.f, input2, output,
+  kernel::get_add_kernel(device_type_)(input1, input2, output,
                                        cuda_config_ ? cuda_config_->stream : nullptr);
   return base::error::Success();
 }
