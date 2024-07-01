@@ -42,7 +42,7 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
 
     float* output_head_ptr = const_cast<float*>(mha_out.ptr<float>()) + h * head_size;
     allocator->memset_zero(output_head_ptr, sizeof(float) * head_size,
-                              config ? config->stream : nullptr, true);
+                              config ? config->stream : nullptr, false);
     tensor::Tensor output_tensor(base::DataType::kDataTypeFp32, head_size, false, nullptr,
                                  output_head_ptr);
     output_tensor.set_device_type(device_type);
