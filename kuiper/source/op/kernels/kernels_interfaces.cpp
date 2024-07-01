@@ -8,6 +8,7 @@
 #include "cpu/scale_kernel.h"
 #include "cpu/softmax_kernel.h"
 #include "cpu/swiglu_kernel.h"
+#include "cpu/scale_sum_kernel.h"
 #include "cuda/add_kernel.cuh"
 #include "cuda/matmul_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
@@ -15,6 +16,7 @@
 #include "cuda/scale_kernel.cuh"
 #include "cuda/softmax_kernel.cuh"
 #include "cuda/swiglu_kernel.cuh"
+#include "cuda/scale_sum_kernel.cuh"
 #include "kernels_interface.h"
 namespace kernel {
 AddKernel get_add_kernel(base::DeviceType device_type) {
@@ -113,4 +115,16 @@ RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type) {
     return nullptr;
   }
 }
+
+ScaleSumKernel get_scale_sum_kernel(base::DeviceType device_type) {
+  if (device_type == base::DeviceType::kDeviceCPU) {
+    return scale_sum_kernel_cpu;
+  } else if (device_type == base::DeviceType::kDeviceCUDA) {
+    return scale_sum_kernel_cu;
+  } else {
+    LOG(FATAL) << "Unknown device type for get a scale and reduce kernel.";
+    return nullptr;
+  }
+}
+
 }  // namespace kernel
