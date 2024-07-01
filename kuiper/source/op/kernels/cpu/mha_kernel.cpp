@@ -50,23 +50,18 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
 
     float* output_head_ptr = const_cast<float*>(mha_out.ptr<float>()) + h * head_size;
     allocator->memset_zero(output_head_ptr, sizeof(float) * head_size,
-                           config ? config->stream : nullptr, true);
+                           config ? config->stream : nullptr, false);
     tensor::Tensor output_tensor(base::DataType::kDataTypeFp32, head_size, false, nullptr,
                                  output_head_ptr);
     output_tensor.set_device_type(device_type);
 
-    for (int32_t t = 0; t <= pos; t++) {
-      float score_value = *(score_head_addr + t);
-      int32_t cache_offset = t * kv_dim + (h / kv_mul) * head_size;
-      float* value_head_addr = const_cast<float*>(value_cache_tensor.ptr<float>()) +
-                               layer_offset + cache_offset;
-      tensor::Tensor value_tensor(base::DataType::kDataTypeFp32, head_size, false,
-                                  nullptr, value_head_addr);
-      value_tensor.set_device_type(device_type);
-
-      get_add_kernel(device_type)(score_value, value_tensor, 1.f, output_tensor,
-                                  output_tensor, config ? config->stream : nullptr);
-    }
+    int32_t cache_offset = (h / kv_mul) * head_size;
+    float* value_head_addr = const_cast<float*>(value_cache_tensor.ptr<float>()) +
+                             layer_offset + cache_offset;
+    tensor::Tensor value_tensor(base::DataType::kDataTypeFp32, head_size, false,
+                                nullptr, value_head_addr);
+    get_scale_sum_kernel(device_type)(value_tensor, score_head_tensor, output_tensor,
+                                      pos, head_size, kv_dim, config ? config->stream : nullptr);
   }
 }
 }  // namespace kernel
