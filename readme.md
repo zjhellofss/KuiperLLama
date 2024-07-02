@@ -10,8 +10,10 @@
 
 
 ## 模型下载地址
-1. llama2 https://pan.baidu.com/s/1PF5KqvIvNFR8yDIY1HmTYA?pwd=ma8r
-
+1. llama2 https://pan.baidu.com/s/1PF5KqvIvNFR8yDIY1HmTYA?pwd=ma8r 或 https://huggingface.co/fushenshen/lession_model/tree/main
+2. 
+   * tinyllama模型 https://huggingface.co/karpathy/tinyllamas/tree/main
+   * tinyllama分词器 https://huggingface.co/yahma/llama-7b-hf/blob/main/tokenizer.model
 ## 编译方法
 ```shell
   # 假设已经装好上述的第三方依赖
