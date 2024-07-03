@@ -23,8 +23,8 @@ enum class LayerType : uint8_t {
 
 class BaseLayer {
  public:
-  explicit BaseLayer(base::DeviceType device_type, LayerType layer_type,
-                     base::DataType data_type, std::string layer_name = "");
+  explicit BaseLayer(base::DeviceType device_type, LayerType layer_type, base::DataType data_type,
+                     std::string layer_name = "");
 
   base::DataType data_type() const;
 
@@ -32,32 +32,23 @@ class BaseLayer {
 
   virtual base::Status init() = 0;
 
-  virtual base::Status base_forward() = 0;
+  virtual base::Status forward() = 0;
 
-  virtual base::Status forward_i1o1(const tensor::Tensor& input1,
-                                    const tensor::Tensor& output1) = 0;
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i2o1(const tensor::Tensor& input1,
-                                    const tensor::Tensor& input2,
-                                    const tensor::Tensor& output1) = 0;
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                               const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i3o1(const tensor::Tensor& input1,
-                                    const tensor::Tensor& input2,
-                                    const tensor::Tensor& input3,
-                                    const tensor::Tensor& output1) = 0;
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                               const tensor::Tensor& input3, const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i4o1(const tensor::Tensor& input1,
-                                    const tensor::Tensor& input2,
-                                    const tensor::Tensor& input3,
-                                    const tensor::Tensor& input4,
-                                    const tensor::Tensor& output1) = 0;
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                               const tensor::Tensor& input3, const tensor::Tensor& input4,
+                               const tensor::Tensor& output1) = 0;
 
-  virtual base::Status forward_i5o1(const tensor::Tensor& input1,
-                                    const tensor::Tensor& input2,
-                                    const tensor::Tensor& input3,
-                                    const tensor::Tensor& input4,
-                                    const tensor::Tensor& input5,
-                                    const tensor::Tensor& output1) = 0;
+  virtual base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                               const tensor::Tensor& input3, const tensor::Tensor& input4,
+                               const tensor::Tensor& input5, const tensor::Tensor& output1) = 0;
 
   virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
 
@@ -77,6 +68,12 @@ class BaseLayer {
 
   virtual const tensor::Tensor& get_output(int32_t idx) const = 0;
 
+  virtual base::Status set_weight(int32_t idx, const tensor::Tensor& weight);
+
+  virtual base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims,
+                                  const float* weight_ptr,
+                                  base::DeviceType device_type = base::DeviceType::kDeviceUnknown);
+
   const std::string& get_layer_name() const;
 
   void set_layer_name(const std::string& layer_name);
@@ -94,40 +91,35 @@ class BaseLayer {
 
 class Layer : public BaseLayer {
  public:
-  explicit Layer(base::DeviceType device_type, LayerType layer_type,
-                 std::string layer_name = "");
+  explicit Layer(base::DeviceType device_type, LayerType layer_type, std::string layer_name = "");
 
   base::Status init() override;
 
   base::Status check_tensor(const tensor::Tensor& tensor, base::DeviceType device_type,
                             base::DataType data_type) const;
 
-  base::Status check_tensor_with_dim(const tensor::Tensor& tensor,
-                                     base::DeviceType device_type,
+  base::Status check_tensor_with_dim(const tensor::Tensor& tensor, base::DeviceType device_type,
                                      base::DataType data_type, ...) const;
 
   base::Status check() const override;
 
-  base::Status base_forward() override;
+  base::Status forward() override;
 
-  base::Status forward_i1o1(const tensor::Tensor& input1,
-                            const tensor::Tensor& output1) override;
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
 
-  base::Status forward_i2o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& output1) override;
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                       const tensor::Tensor& output1) override;
 
-  base::Status forward_i3o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& input3,
-                            const tensor::Tensor& output1) override;
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                       const tensor::Tensor& input3, const tensor::Tensor& output1) override;
 
-  base::Status forward_i4o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& input3, const tensor::Tensor& input4,
-                            const tensor::Tensor& output1) override;
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                       const tensor::Tensor& input3, const tensor::Tensor& input4,
+                       const tensor::Tensor& output1) override;
 
-  base::Status forward_i5o1(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                            const tensor::Tensor& input3, const tensor::Tensor& input4,
-                            const tensor::Tensor& input5,
-                            const tensor::Tensor& output1) override;
+  base::Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
+                       const tensor::Tensor& input3, const tensor::Tensor& input4,
+                       const tensor::Tensor& input5, const tensor::Tensor& output1) override;
 
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 
@@ -154,10 +146,12 @@ class Layer : public BaseLayer {
   void set_cuda_config(std::shared_ptr<kernel::CudaConfig> config);
   std::shared_ptr<kernel::CudaConfig> cuda_config_;
 
-  std::shared_ptr<kernel::CudaConfig>  cuda_config() const;
+  std::shared_ptr<kernel::CudaConfig> cuda_config() const;
+
  protected:
   std::vector<tensor::Tensor> inputs_;
   std::vector<tensor::Tensor> outputs_;
+  std::vector<std::shared_ptr<Layer>> output_layers_;
 };
 
 class LayerFp32Param : public Layer {
@@ -175,10 +169,10 @@ class LayerFp32Param : public Layer {
 
   void to_cuda() override;
 
-  void set_weight(int32_t idx, const tensor::Tensor& weight);
+  base::Status set_weight(int32_t idx, const tensor::Tensor& weight) override;
 
-  void set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr,
-                  base::DeviceType device_type = base::DeviceType::kDeviceUnknown);
+  base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr,
+                          base::DeviceType device_type = base::DeviceType::kDeviceUnknown) override;
 
  private:
   std::vector<tensor::Tensor> weights_;

@@ -13,7 +13,7 @@ RoPELayer::RoPELayer(base::DeviceType device_type, int32_t dim, int32_t kv_dim,
   reset_output_size(1);
 }
 
-base::Status RoPELayer::base_forward() {
+base::Status RoPELayer::forward() {
   base::Status status = check();
   if (!status) {
     return status;

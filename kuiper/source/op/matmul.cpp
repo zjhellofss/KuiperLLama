@@ -32,7 +32,7 @@ base::Status MatmulLayer::check() const {
   return base::error::Success();
 }
 
-base::Status MatmulLayer::base_forward() {
+base::Status MatmulLayer::forward() {
   auto status = check();
   if (!status) {
     return status;

@@ -29,7 +29,7 @@ base::Status SwiGLULayer::check() const {
   return base::error::Success();
 }
 
-base::Status SwiGLULayer::base_forward() {
+base::Status SwiGLULayer::forward() {
   auto status = check();
   if (!status) {
     return status;

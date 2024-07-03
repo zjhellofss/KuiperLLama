@@ -16,7 +16,7 @@ MultiHeadAttention::MultiHeadAttention(base::DeviceType device_type, int32_t lay
   reset_output_size(1);
 }
 
-base::Status MultiHeadAttention::base_forward() {
+base::Status MultiHeadAttention::forward() {
   auto status = check();
   if (!status) {
     return status;

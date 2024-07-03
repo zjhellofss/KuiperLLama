@@ -8,7 +8,7 @@ class SwiGLULayer : public op::Layer {
 
   base::Status check() const override;
 
-  base::Status base_forward() override;
+  base::Status forward() override;
 
  private:
   int32_t hidden_dim_ = 0;

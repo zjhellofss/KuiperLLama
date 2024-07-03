@@ -15,23 +15,23 @@ struct EmbeddingOutput {
 };
 
 struct LLama2Layers {
-  std::shared_ptr<op::VecAddLayer> add_layer_;
-  std::shared_ptr<op::RoPELayer> rope_layer_;
-  std::shared_ptr<op::SwiGLULayer> swiglu_layer_;
+  std::shared_ptr<op::Layer> add_layer_;
+  std::shared_ptr<op::Layer> rope_layer_;
+  std::shared_ptr<op::Layer> swiglu_layer_;
 
-  std::vector<std::shared_ptr<op::MultiHeadAttention>> mha_layers_;
-  std::vector<std::shared_ptr<op::MatmulLayer>> wq_layers_;
-  std::vector<std::shared_ptr<op::MatmulLayer>> wk_layers_;
-  std::vector<std::shared_ptr<op::MatmulLayer>> wv_layers_;
-  std::vector<std::shared_ptr<op::MatmulLayer>> wo_layers_;
+  std::vector<std::shared_ptr<op::Layer>> mha_layers_;
+  std::vector<std::shared_ptr<op::Layer>> wq_layers_;
+  std::vector<std::shared_ptr<op::Layer>> wk_layers_;
+  std::vector<std::shared_ptr<op::Layer>> wv_layers_;
+  std::vector<std::shared_ptr<op::Layer>> wo_layers_;
 
-  std::vector<std::shared_ptr<op::MatmulLayer>> w1_layers_;
-  std::vector<std::shared_ptr<op::MatmulLayer>> w2_layers_;
-  std::vector<std::shared_ptr<op::RmsNormLayer>> rmsnorm_layers_;
-  std::vector<std::shared_ptr<op::MatmulLayer>> w3_layers_;
-  std::shared_ptr<op::MatmulLayer> cls_layer_;
+  std::vector<std::shared_ptr<op::Layer>> w1_layers_;
+  std::vector<std::shared_ptr<op::Layer>> w2_layers_;
+  std::vector<std::shared_ptr<op::Layer>> rmsnorm_layers_;
+  std::vector<std::shared_ptr<op::Layer>> w3_layers_;
+  std::shared_ptr<op::Layer> cls_layer_;
 
-  std::shared_ptr<op::EmbeddingLayer> embedding_layer_;
+  std::shared_ptr<op::Layer> embedding_layer_;
 
   void to_cuda();
 };
@@ -46,8 +46,8 @@ class LLama2Model : public Model {
 
   std::vector<int32_t> encode(const std::string& sentence) const override;
 
-  std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(
-      int32_t layer_idx, int32_t token_pos) const override;
+  std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
+                                                           int32_t token_pos) const override;
 
  private:
   void init_mem() override;

@@ -32,7 +32,7 @@ base::Status VecAddLayer::check() const {
   return base::error::Success();
 }
 
-base::Status VecAddLayer::base_forward() {
+base::Status VecAddLayer::forward() {
   auto status = this->check();
   if (!status) {
     return status;

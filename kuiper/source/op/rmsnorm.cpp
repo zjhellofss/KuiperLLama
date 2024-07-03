@@ -11,7 +11,7 @@ RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
   reset_weight_size(1);
 }
 
-base::Status RmsNormLayer::base_forward() {
+base::Status RmsNormLayer::forward() {
   auto status = check();
   if (!status) {
     return status;
