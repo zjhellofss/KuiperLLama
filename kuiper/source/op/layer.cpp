@@ -17,6 +17,12 @@ base::DataType BaseLayer::data_type() const { return data_type_; }
 
 LayerType BaseLayer::layer_type() const { return layer_type_; }
 
+base::Status BaseLayer::set_output_layer(std::shared_ptr<Layer> output_layer) {
+  return base::error::FunctionNotImplement();
+}
+
+std::shared_ptr<Layer> BaseLayer::get_output_layer() { return nullptr; }
+
 base::Status BaseLayer::set_weight(int32_t idx, const tensor::Tensor& weight) {
   return base::error::FunctionNotImplement();
 }
@@ -250,6 +256,10 @@ base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& 
 
   this->set_output(0, output1);
   return this->forward();
+}
+
+base::Status Layer::set_output_layer(std::shared_ptr<Layer> output_layer) {
+  this->output_layers_.push_back(output_layer);
 }
 
 tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {

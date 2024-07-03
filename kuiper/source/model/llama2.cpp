@@ -494,7 +494,7 @@ base::Status LLama2Model::create_layers() {
   return error::Success();
 }
 
-EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
+op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
   auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
   input_tokens.reshape({static_cast<int32_t>(tokens.size())});
@@ -508,7 +508,7 @@ EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
       << "The embedding layer in the llama2 model is null pointer.";
   STATUS_CHECK(
       llama_layers_->embedding_layer_->forward(input_tokens, input_token_num, input_embeddings));
-  EmbeddingOutput output;
+  op::EmbeddingOutput output;
   output.input_embeddings = input_embeddings;
   output.input_tokens = input_tokens;
   output.input_token_num = input_token_num;
@@ -517,7 +517,7 @@ EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
 
 void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
                              const std::vector<int32_t>& tokens, tensor::Tensor& input,
-                             const EmbeddingOutput& embedding_output) const {
+                             const op::EmbeddingOutput& embedding_output) const {
   CHECK(llama_layers_ != nullptr);
   const int32_t pos = pos_tensor.index<int32_t>(0);
   if (pos < tokens.size()) {

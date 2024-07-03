@@ -8,12 +8,6 @@
 #include "op/swiglu.h"
 namespace model {
 
-struct EmbeddingOutput {
-  tensor::Tensor input_tokens;
-  tensor::Tensor input_embeddings;
-  tensor::Tensor input_token_num;
-};
-
 struct LLama2Layers {
   std::shared_ptr<op::Layer> add_layer_;
   std::shared_ptr<op::Layer> rope_layer_;
@@ -60,7 +54,7 @@ class LLama2Model : public Model {
 
   void attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
-  EmbeddingOutput embedding(const std::vector<int>& tokens) const;
+  op::EmbeddingOutput embedding(const std::vector<int>& tokens) const;
 
   void attention_rms(int32_t layer_idx, const tensor::Tensor& input) const;
 
@@ -68,7 +62,7 @@ class LLama2Model : public Model {
 
   void fill_input(int32_t next, const tensor::Tensor& pos_tensor,
                   const std::vector<int32_t>& tokens, tensor::Tensor& input,
-                  const EmbeddingOutput& embedding_output) const;
+                  const op::EmbeddingOutput& embedding_output) const;
 
   void attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
