@@ -27,7 +27,7 @@ struct LLama2Layers {
 
   std::shared_ptr<op::Layer> embedding_layer_;
 
-  void to_cuda();
+  void to_cuda(std::shared_ptr<kernel::CudaConfig> config);
 };
 
 class LLama2Model : public Model {

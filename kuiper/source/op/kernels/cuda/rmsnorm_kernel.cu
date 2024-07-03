@@ -1,8 +1,6 @@
 #include "rmsnorm_kernel.cuh"
 #include "utils.cuh"
-#define WARP_SIZE 32
 namespace kernel {
-
 static __global__ void row_rmsnorm_f32(const float* in, const float* wei, float* out,
                                        const int size, const float eps) {
   const int tid = threadIdx.x;

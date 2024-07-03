@@ -7,76 +7,92 @@
 #include "sampler/mult_sampler.h"
 namespace model {
 
-void LLama2Layers::to_cuda() {
+void LLama2Layers::to_cuda(std::shared_ptr<kernel::CudaConfig> config) {
   if (add_layer_) {
     add_layer_->to_cuda();
+    add_layer_->set_cuda_config(config);
   }
 
   if (rope_layer_) {
     rope_layer_->to_cuda();
+    rope_layer_->set_cuda_config(config);
   }
 
   if (swiglu_layer_) {
     swiglu_layer_->to_cuda();
+    swiglu_layer_->set_cuda_config(config);
   }
 
   if (cls_layer_) {
     cls_layer_->to_cuda();
+    cls_layer_->set_cuda_config(config);
   }
 
   if (embedding_layer_) {
     embedding_layer_->to_cuda();
+    embedding_layer_->set_cuda_config(config);
   }
 
   for (auto& mha_layer : mha_layers_) {
     if (mha_layer) {
       mha_layer->to_cuda();
+      mha_layer->set_cuda_config(config);
     }
   }
 
   for (auto& weight_layer : wq_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
 
   for (auto& weight_layer : wk_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
 
   for (auto& weight_layer : wv_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
 
   for (auto& weight_layer : wo_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
 
   for (auto& weight_layer : w1_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
+
   for (auto& weight_layer : w2_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
+
   for (auto& weight_layer : w3_layers_) {
     if (weight_layer) {
       weight_layer->to_cuda();
+      weight_layer->set_cuda_config(config);
     }
   }
 
   for (auto& rms_norm_layer : rmsnorm_layers_) {
     if (rms_norm_layer) {
       rms_norm_layer->to_cuda();
+      rms_norm_layer->set_cuda_config(config);
     }
   }
 }
@@ -91,7 +107,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   }
 
   device_type_ = device_type;
-  if (device_type == base::DeviceType::kDeviceCUDA) {
+  if (device_type == DeviceType::kDeviceCUDA) {
     cudaSetDevice(0);
     cuda_config_ = std::make_shared<kernel::CudaConfig>();
     cudaStreamCreate(&cuda_config_->stream);
@@ -155,22 +171,18 @@ void LLama2Model::create_nonparam_layers() {
   CHECK(llama_layers_ != nullptr);
   llama_layers_->rope_layer_ = std::make_shared<op::RoPELayer>(
       device_type_, config_->dim_, config_->kv_dim_, config_->head_size_);
-  llama_layers_->rope_layer_->set_cuda_config(cuda_config_);
 
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto mha_layer = std::make_shared<op::MultiHeadAttention>(
         device_type_, i, config_->kv_mul_, config_->kv_dim_, config_->seq_len_, config_->head_num_,
         config_->head_size_);
-    mha_layer->set_cuda_config(cuda_config_);
     llama_layers_->mha_layers_.push_back(mha_layer);
   }
 
   llama_layers_->add_layer_ = std::make_shared<op::VecAddLayer>(device_type_);
-  llama_layers_->add_layer_->set_cuda_config(cuda_config_);
 
   llama_layers_->swiglu_layer_ =
       std::make_shared<op::SwiGLULayer>(device_type_, config_->hidden_dim_);
-  llama_layers_->swiglu_layer_->set_cuda_config(cuda_config_);
 }
 
 void LLama2Model::create_param_layers() {
@@ -179,7 +191,6 @@ void LLama2Model::create_param_layers() {
   auto cpu_device_type = base::DeviceType::kDeviceCPU;
   llama_layers_->embedding_layer_ = std::make_shared<op::EmbeddingLayer>(
       device_type_, config_->dim_, config_->seq_len_, std::abs(config_->vocab_size_));
-  llama_layers_->embedding_layer_->set_cuda_config(cuda_config_);
 
   const float* weight_embedding = raw_model_data_->weight(0);
   llama_layers_->embedding_layer_->set_weight(0, {std::abs(config_->vocab_size_), config_->dim_},
@@ -192,7 +203,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto wq = std::make_shared<op::MatmulLayer>(device_type_, dim, dim);
     wq->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    wq->set_cuda_config(cuda_config_);
     llama_layers_->wq_layers_.push_back(wq);
     pos += dim * dim;
   }
@@ -201,7 +211,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto wk = std::make_shared<op::MatmulLayer>(device_type_, config_->kv_dim_, dim);
     wk->set_weight(0, {config_->kv_dim_, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    wk->set_cuda_config(cuda_config_);
     llama_layers_->wk_layers_.push_back(wk);
     pos += config_->kv_dim_ * dim;
   }
@@ -210,7 +219,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto wv = std::make_shared<op::MatmulLayer>(device_type_, config_->kv_dim_, dim);
     wv->set_weight(0, {config_->kv_dim_, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    wv->set_cuda_config(cuda_config_);
     llama_layers_->wv_layers_.push_back(wv);
     pos += config_->kv_dim_ * dim;
   }
@@ -219,7 +227,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto wo = std::make_shared<op::MatmulLayer>(device_type_, dim, dim);
     wo->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    wo->set_cuda_config(cuda_config_);
     llama_layers_->wo_layers_.push_back(wo);
     pos += dim * dim;
   }
@@ -232,7 +239,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto w1 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim);
     w1->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    w1->set_cuda_config(cuda_config_);
     llama_layers_->w1_layers_.push_back(w1);
     pos += dim * hidden_dim;
   }
@@ -241,7 +247,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto w2 = std::make_shared<op::MatmulLayer>(device_type_, dim, hidden_dim);
     w2->set_weight(0, {dim, hidden_dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    w2->set_cuda_config(cuda_config_);
     llama_layers_->w2_layers_.push_back(w2);
     pos += dim * hidden_dim;
   }
@@ -250,7 +255,6 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     auto w3 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim);
     w3->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
-    w3->set_cuda_config(cuda_config_);
     llama_layers_->w3_layers_.push_back(w3);
     pos += dim * hidden_dim;
   }
@@ -269,7 +273,6 @@ void LLama2Model::create_param_layers() {
     llama_layers_->cls_layer_->set_weight(0, {config_->vocab_size_, dim},
                                           this->raw_model_data_->weight(pos), cpu_device_type);
   }
-  llama_layers_->cls_layer_->set_cuda_config(cuda_config_);
 
   // create rmsnorm layer
   size_t rmsnorm_pos = config_->dim_ * std::abs(config_->vocab_size_);
@@ -280,7 +283,6 @@ void LLama2Model::create_param_layers() {
 
     const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
     rms_norm_layer->set_weight(0, {config_->dim_}, weight_rmsnorm, cpu_device_type);
-    rms_norm_layer->set_cuda_config(cuda_config_);
     llama_layers_->rmsnorm_layers_.push_back(rms_norm_layer);
 
     rmsnorm_pos += config_->dim_;
@@ -298,7 +300,6 @@ void LLama2Model::create_param_layers() {
         std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
     const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
     rms_norm_layer->set_weight(0, {config_->dim_}, weight_rmsnorm, cpu_device_type);
-    rms_norm_layer->set_cuda_config(cuda_config_);
     llama_layers_->rmsnorm_layers_.push_back(rms_norm_layer);
 
     rmsnorm_pos += config_->dim_;
@@ -313,7 +314,6 @@ void LLama2Model::create_param_layers() {
 
   const float* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
   rms_final_layer->set_weight(0, {config_->dim_}, weight_rmsnorm_final, cpu_device_type);
-  rms_final_layer->set_cuda_config(cuda_config_);
   llama_layers_->rmsnorm_layers_.push_back(rms_final_layer);
 }
 
@@ -331,7 +331,8 @@ void LLama2Model::init_mem() {
   }
 
   if (device_type_ == base::DeviceType::kDeviceCUDA) {
-    llama_layers_->to_cuda();
+    CHECK_NE(cuda_config_, nullptr);
+    llama_layers_->to_cuda(cuda_config_);
   }
 
   std::shared_ptr<base::DeviceAllocator> alloc_cpu =

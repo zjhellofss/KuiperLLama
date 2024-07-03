@@ -69,10 +69,6 @@ class BaseLayer {
 
   virtual const tensor::Tensor& get_output(int32_t idx) const = 0;
 
-  virtual base::Status set_output_layer(std::shared_ptr<Layer> output_layer);
-
-  virtual std::shared_ptr<Layer> get_output_layer();
-
   virtual base::Status set_weight(int32_t idx, const tensor::Tensor& weight);
 
   virtual base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims,
@@ -126,10 +122,6 @@ class Layer : public BaseLayer {
                        const tensor::Tensor& input3, const tensor::Tensor& input4,
                        const tensor::Tensor& input5, const tensor::Tensor& output1) override;
 
-  base::Status set_output_layer(std::shared_ptr<Layer> output_layer) override;
-
-  std::shared_ptr<Layer> get_output_layer() override;
-
   void set_input(int32_t idx, const tensor::Tensor& input) override;
 
   void set_output(int32_t idx, const tensor::Tensor& output) override;
@@ -159,7 +151,6 @@ class Layer : public BaseLayer {
  protected:
   std::vector<tensor::Tensor> inputs_;
   std::vector<tensor::Tensor> outputs_;
-  std::vector<std::shared_ptr<Layer>> output_layers_;
   std::shared_ptr<kernel::CudaConfig> cuda_config_;
 };
 
