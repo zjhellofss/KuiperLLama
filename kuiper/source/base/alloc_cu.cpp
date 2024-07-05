@@ -10,7 +10,7 @@ void* CUDADeviceAllocator::allocate(size_t byte_size) const {
     return nullptr;
   }
   void* ptr = nullptr;
-  cudaError_t err = cudaMalloc(&ptr, byte_size);
+  cudaError_t err = cudaMallocManaged(&ptr, byte_size);
   CHECK_EQ(err, cudaSuccess);
   return ptr;
 }

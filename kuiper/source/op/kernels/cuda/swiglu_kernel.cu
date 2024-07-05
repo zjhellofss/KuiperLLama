@@ -1,9 +1,7 @@
 #include <tensor/tensor.h>
 #include "swiglu_kernel.cuh"
-#include "utils.cuh"
 namespace kernel {
-__global__ void swiglu_kernel_cu_fp32(int size, const float* in1, const float* in2,
-                                      float* out) {
+__global__ void swiglu_kernel_cu_fp32(int size, const float* in1, const float* in2, float* out) {
   int tid = threadIdx.x;
   int idx = threadIdx.x + blockDim.x * blockIdx.x;
   if (idx > size) {
@@ -36,16 +34,14 @@ void swiglu_kernel_cu(const tensor::Tensor& input1, const tensor::Tensor& input2
   int size = static_cast<int32_t>(input1.size());
   int threads = 128;
   int blocks = (size + threads - 1) / threads;
-  const size_t shmem = (KUIPER_PAD(size, WARP_SIZE) + WARP_SIZE) * sizeof(float) * 2;
+  const size_t shmem = size * sizeof(float) * 2;
   if (!stream) {
     swiglu_kernel_cu_fp32<<<blocks, threads, shmem>>>(
-        size, input1.ptr<float>(), input2.ptr<float>(),
-        const_cast<float*>(output.ptr<float>()));
+        size, input1.ptr<float>(), input2.ptr<float>(), const_cast<float*>(output.ptr<float>()));
   } else {
     cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
     swiglu_kernel_cu_fp32<<<blocks, threads, shmem, stream_>>>(
-        size, input1.ptr<float>(), input2.ptr<float>(),
-        const_cast<float*>(output.ptr<float>()));
+        size, input1.ptr<float>(), input2.ptr<float>(), const_cast<float*>(output.ptr<float>()));
   }
 }
 }  // namespace kernel

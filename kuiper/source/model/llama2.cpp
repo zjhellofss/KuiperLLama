@@ -9,83 +9,83 @@ namespace model {
 
 void LLama2Layers::to_cuda(std::shared_ptr<kernel::CudaConfig> config) {
   if (add_layer_) {
-    add_layer_->to_cuda();
     add_layer_->set_cuda_config(config);
+    add_layer_->to_cuda();
   }
 
   if (rope_layer_) {
-    rope_layer_->to_cuda();
     rope_layer_->set_cuda_config(config);
+    rope_layer_->to_cuda();
   }
 
   if (swiglu_layer_) {
-    swiglu_layer_->to_cuda();
     swiglu_layer_->set_cuda_config(config);
+    swiglu_layer_->to_cuda();
   }
 
   if (cls_layer_) {
-    cls_layer_->to_cuda();
     cls_layer_->set_cuda_config(config);
+    cls_layer_->to_cuda();
   }
 
   if (embedding_layer_) {
-    embedding_layer_->to_cuda();
     embedding_layer_->set_cuda_config(config);
+    embedding_layer_->to_cuda();
   }
 
   for (auto& mha_layer : mha_layers_) {
     if (mha_layer) {
-      mha_layer->to_cuda();
       mha_layer->set_cuda_config(config);
+      mha_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : wq_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : wk_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : wv_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : wo_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : w1_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : w2_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
   for (auto& weight_layer : w3_layers_) {
     if (weight_layer) {
-      weight_layer->to_cuda();
       weight_layer->set_cuda_config(config);
+      weight_layer->to_cuda();
     }
   }
 
@@ -127,43 +127,23 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
   return error::Success();
 }
 
-base::Status LLama2Model::forward(const std::vector<int>& tokens, int32_t total_steps) {
-  if (tokens.empty()) {
-    return base::error::InvalidArgument("The token array is empty.");
+base::Status LLama2Model::forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
+                                  bool is_prompt, int& next) {
+  if (input.is_empty()) {
+    return base::error::InvalidArgument("The input tensor is empty.");
   }
 
-  const auto& embedding_output = embedding(tokens);
-  int32_t pos = 0;
-  int32_t next = -1;
-  int32_t eos = encode_layer_->eos();
-  tensor::Tensor pos_tensor = get_buffer(ModelBufferType::kInputPos);
-  while (pos < total_steps && pos < config_->seq_len_) {
-    // set input and pos
-    pos_tensor.index<int32_t>(0) = pos;
-    tensor::Tensor input(base::DataType::kDataTypeFp32, config_->dim_);
-    fill_input(next, pos_tensor, tokens, input, embedding_output);
-
-    for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
-      attention_rms(layer_idx, input);
-
-      // attention (wq wk wv @ input)
-      attention_qkv(layer_idx, pos_tensor);
-      // multi-head attention
-      attention_mha(layer_idx, pos_tensor);
-
-      // feed forward
-      feed_forward(layer_idx, input);
-    }
-
-    cls_logits(input);
-    const std::string& decode_str = post_processing(pos, next, tokens);
-    printf("%05d %s\n", next, decode_str.c_str());
-    fflush(stdout);
-    if (next == eos) {
-      break;
-    }
-    pos += 1;
+  for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
+    attention_rms(layer_idx, input);
+    // attention (wq wk wv @ input)
+    attention_qkv(layer_idx, pos_tensor);
+    // multi-head attention
+    attention_mha(layer_idx, pos_tensor);
+    // feed forward
+    feed_forward(layer_idx, input);
   }
+  cls_logits(input);
+  next = post_processing(pos_tensor, is_prompt);
   return base::error::Success();
 }
 
@@ -320,6 +300,16 @@ void LLama2Model::create_param_layers() {
 std::vector<int32_t> LLama2Model::encode(const std::string& sentence) const {
   CHECK(encode_layer_ != nullptr);
   return encode_layer_->encode(sentence);
+}
+
+int32_t LLama2Model::get_eos() {
+  CHECK(this->encode_layer_ != nullptr);
+  return this->encode_layer_->eos();
+}
+
+std::string LLama2Model::decode(int32_t token_idx) const {
+  CHECK(this->encode_layer_ != nullptr);
+  return this->encode_layer_->decode(token_idx);
 }
 
 void LLama2Model::init_mem() {
@@ -516,37 +506,24 @@ op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const
   return output;
 }
 
-void LLama2Model::fill_input(int32_t next, const tensor::Tensor& pos_tensor,
-                             const std::vector<int32_t>& tokens, tensor::Tensor& input,
-                             const op::EmbeddingOutput& embedding_output) const {
-  CHECK(llama_layers_ != nullptr);
+tensor::Tensor LLama2Model::fill_input(const tensor::Tensor& pos_tensor,
+                                       const op::EmbeddingOutput& embedding_output,
+                                       bool is_prompt) const {
   const int32_t pos = pos_tensor.index<int32_t>(0);
-  if (pos < tokens.size()) {
-    auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
+  auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
 
-    std::shared_ptr<base::Buffer> input_emb_buffer =
-        std::make_shared<base::Buffer>(config_->dim_ * sizeof(float), nullptr,
-                                       input_embeddings.ptr<float>(pos * config_->dim_), true);
-    input.assign(input_emb_buffer);
-  } else {
-    CHECK(llama_layers_ != nullptr);
-    // generate steps
-    auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
-    auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
-    auto input_token_num = tensor::Tensor(base::DataType::kDataTypeInt32, 1);
-    CHECK_NE(next, -1) << "The next token is -1.";
-    input_tokens.reshape({1});
-    input_tokens.index<int32_t>(0) = next;
-    CHECK_NE(llama_layers_->embedding_layer_, nullptr)
-        << "The embedding layer in the llama2 model is null pointer.";
-    STATUS_CHECK(
-        llama_layers_->embedding_layer_->forward(input_tokens, input_token_num, input_embeddings));
-
-    std::shared_ptr<base::Buffer> input_emb_buffer = std::make_shared<base::Buffer>(
-        config_->dim_ * sizeof(float), nullptr, input_embeddings.ptr<float>(0), true);
-    input.assign(input_emb_buffer);  // 1024
+  int32_t index = 0;
+  if (is_prompt) {
+    index = pos;
   }
+  std::shared_ptr<base::Buffer> input_emb_buffer =
+      std::make_shared<base::Buffer>(config_->dim_ * sizeof(float), nullptr,
+                                     input_embeddings.ptr<float>(index * config_->dim_), true);
+
+  tensor::Tensor input(base::DataType::kDataTypeFp32, config_->dim_);
+  input.assign(input_emb_buffer);
   input.set_device_type(device_type_);
+  return input;
 }
 
 void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) const {
@@ -669,25 +646,23 @@ void LLama2Model::cls_logits(const tensor::Tensor& input) const {
   STATUS_CHECK(llama_layers_->cls_layer_->forward(input, forward_output));
 }
 
-std::string LLama2Model::post_processing(int32_t pos, int32_t& next,
-                                         const std::vector<int32_t>& tokens) const {
+int32_t LLama2Model::post_processing(const tensor::Tensor& pos, bool is_prompt) const {
   tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
   const float* forward_logits = forward_output.ptr<float>();
   if (device_type_ == base::DeviceType::kDeviceCUDA) {
-    cudaDeviceSynchronize();
     const float* forward_logits_cpu = get_buffer(ModelBufferType::kForwardOutputCPU).ptr<float>();
     cudaMemcpy(const_cast<float*>(forward_logits_cpu), forward_logits, forward_output.byte_size(),
                cudaMemcpyDeviceToHost);
     forward_logits = forward_logits_cpu;
   }
 
-  if (pos < tokens.size() - 1) {
-    next = tokens[pos + 1];
+  int32_t next = 0;
+  if (is_prompt) {
+    next = -1;
   } else {
     next = sampler_->sample(forward_logits, static_cast<int32_t>(forward_output.size()));
   }
-  const std::string& output_str = this->encode_layer_->decode(next);
-  return output_str;
+  return next;
 }
 
 }  // namespace model

@@ -19,6 +19,7 @@ void DeviceAllocator::memcpy(const void* src_ptr, void* dest_ptr, size_t byte_si
     if (!stream_) {
       cudaMemcpy(dest_ptr, src_ptr, byte_size, cudaMemcpyHostToDevice);
     } else {
+      auto e = cudaGetLastError();
       cudaMemcpyAsync(dest_ptr, src_ptr, byte_size, cudaMemcpyHostToDevice, stream_);
     }
   } else if (memcpy_kind == MemcpyKind::kMemcpyCUDA2CPU) {

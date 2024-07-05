@@ -1,5 +1,5 @@
+#include <cub/block/block_reduce.cuh>
 #include "softmax_kernel.cuh"
-#include "utils.cuh"
 namespace kernel {
 __global__ void row_softmax_fp32(const float* in, int size) {
   const int tid = threadIdx.x;
@@ -7,20 +7,35 @@ __global__ void row_softmax_fp32(const float* in, int size) {
   const float* x = in;
   float* y = const_cast<float*>(in);
 
-  float maxval = -INFINITY;
+  float max_val = -INFINITY;
   for (int i = lane_id; i < size; i += warpSize) {
-    maxval = fmaxf(maxval, x[i]);
+    max_val = fmaxf(max_val, x[i]);
   }
-  maxval = warp_reduce_max(maxval);
+
+  using WarpReduce = cub::WarpReduce<float>;
+  __shared__ WarpReduce::TempStorage temp;
+  __shared__ float shared_val;
+  max_val = WarpReduce(temp).Reduce(max_val, cub::Max());
+
+  if (threadIdx.x == 0) {
+    shared_val = max_val;
+  }
+  __syncthreads();
+  max_val = shared_val;
 
   float sum = 0.0f;
   for (int i = lane_id; i < size; i += warpSize) {
-    sum += expf(x[i] - maxval);
+    sum += expf(x[i] - max_val);
   }
 
-  sum = warp_reduce_sum(sum);
+  sum = WarpReduce(temp).Sum(sum);
+  if (threadIdx.x == 0) {
+    shared_val = sum;
+  }
+  __syncthreads();
+  sum = shared_val;
   for (int i = lane_id; i < size; i += warpSize) {
-    y[i] = expf(x[i] - maxval) / sum;
+    y[i] = expf(x[i] - max_val) / sum;
   }
 }
 

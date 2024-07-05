@@ -1,6 +1,9 @@
+#include <cub/block/block_reduce.cuh>
+#include <cub/warp/warp_reduce.cuh>
 #include "rmsnorm_kernel.cuh"
-#include "utils.cuh"
 namespace kernel {
+__global__ void multihead_attention_fp32() {}
+
 static __global__ void row_rmsnorm_f32(const float* in, const float* wei, float* out,
                                        const int size, const float eps) {
   const int tid = threadIdx.x;
@@ -11,7 +14,16 @@ static __global__ void row_rmsnorm_f32(const float* in, const float* wei, float*
     sum += in[i] * in[i];
   }
 
-  sum = warp_reduce_sum(sum);
+  using WarpReduce = cub::WarpReduce<float, 32>;
+  __shared__ typename WarpReduce::TempStorage temp;
+  __shared__ float shared_val;
+  sum = WarpReduce(temp).Reduce(sum, cub::Sum());
+  if (threadIdx.x == 0) {
+    shared_val = sum;
+  }
+  __syncthreads();
+  sum = shared_val;
+
   const float scale = rsqrtf(sum / static_cast<float>(size) + eps);
   for (int i = lane_id; i < size; i += warpSize) {
     out[i] = scale * in[i] * wei[i];
@@ -37,8 +49,7 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
     constexpr int threads_num = 128;
     if (stream) {
       cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
-      row_rmsnorm_f32<<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size,
-                                                      eps);
+      row_rmsnorm_f32<<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size, eps);
     } else {
       row_rmsnorm_f32<<<1, threads_num>>>(in_ptr, wei_ptr, out_ptr, size, eps);
     }
@@ -46,8 +57,7 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
     constexpr int threads_num = 1024;
     if (stream) {
       cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
-      row_rmsnorm_f32<<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size,
-                                                      eps);
+      row_rmsnorm_f32<<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size, eps);
     } else {
       row_rmsnorm_f32<<<1, threads_num>>>(in_ptr, wei_ptr, out_ptr, size, eps);
     }

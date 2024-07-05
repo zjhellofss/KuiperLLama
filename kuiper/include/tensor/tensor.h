@@ -1,5 +1,6 @@
 #ifndef KUIPER_INCLUDE_TENSOR_TENSOR_H_
 #define KUIPER_INCLUDE_TENSOR_TENSOR_H_
+#include <driver_types.h>
 #include <glog/logging.h>
 #include <armadillo>
 #include <memory>
@@ -31,7 +32,7 @@ class Tensor {
 
   void to_cpu();
 
-  void to_cuda();
+  void to_cuda(cudaStream_t stream, int u = 31);
 
   bool is_empty() const;
 
@@ -66,7 +67,7 @@ class Tensor {
 
   void reset(base::DataType data_type, const std::vector<int32_t>& dims);
 
-  void set_device_type(base::DeviceType device_type);
+  void set_device_type(base::DeviceType device_type) const;
 
   base::DeviceType device_type() const;
 

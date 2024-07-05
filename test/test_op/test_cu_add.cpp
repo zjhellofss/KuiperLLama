@@ -41,7 +41,7 @@ TEST(test_add_cu, add1_stream) {
 
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-  kernel::get_add_kernel(base::DeviceType::kDeviceCUDA)(1.f, t1, 1.f, t2, out, stream);
+  kernel::get_add_kernel(base::DeviceType::kDeviceCUDA)(t1, t2, out, stream);
   cudaDeviceSynchronize();
   float* output = new float[size];
   cudaMemcpy(output, out.ptr<float>(), size * sizeof(float), cudaMemcpyDeviceToHost);

@@ -50,12 +50,14 @@ struct RawModelData {
 
 class Model {
  public:
-  explicit Model(base::ModelType model_type, std::string token_path,
-                 std::string model_path);
+  explicit Model(base::ModelType model_type, std::string token_path, std::string model_path);
 
   virtual base::Status init(base::DeviceType device_type) = 0;
 
-  virtual base::Status forward(const std::vector<int>& tokens, int start_pos) = 0;
+  virtual base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
+                               bool is_prompt, int& next) = 0;
+
+  virtual int32_t get_eos() = 0;
 
   base::ModelType model_type() const;
 
@@ -67,9 +69,10 @@ class Model {
 
   virtual const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const;
 
+  virtual std::string decode(int32_t token_idx) const = 0;
+
  protected:
-  virtual base::Status insert_buffer(ModelBufferType buffer_idx,
-                                     const tensor::Tensor& tensor);
+  virtual base::Status insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor);
 
   virtual base::Status read_model_file();
 
@@ -79,8 +82,7 @@ class Model {
 
   virtual base::Status generate_model_infos(const ModelConfig& config) const;
 
-  virtual std::string post_processing(int32_t pos, int32_t& next,
-                                      const std::vector<int32_t>& tokens) const = 0;
+  virtual int32_t post_processing(const tensor::Tensor& pos, bool is_prompt) const = 0;
 
  private:
   virtual void init_mem() = 0;
@@ -89,8 +91,8 @@ class Model {
 
   virtual std::vector<int32_t> encode(const std::string& sentence) const = 0;
 
-  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(
-      int32_t layer_idx, int32_t token_pos) const = 0;
+  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
+                                                                   int32_t token_pos) const = 0;
 
   virtual void create_param_layers() = 0;
 

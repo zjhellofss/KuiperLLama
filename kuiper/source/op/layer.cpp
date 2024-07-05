@@ -127,12 +127,12 @@ void Layer::reset_output_size(size_t size) { outputs_.resize(size); }
 void Layer::to_cuda() {
   for (auto& input : inputs_) {
     if (!input.is_empty()) {
-      input.to_cuda();
+      input.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
     }
   }
   for (auto& output : outputs_) {
     if (!output.is_empty()) {
-      output.to_cuda();
+      output.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
     }
   }
 }
@@ -174,7 +174,7 @@ const tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) const {
 void LayerFp32Param::to_cuda() {
   Layer::to_cuda();
   for (auto& weight : weights_) {
-    weight.to_cuda();
+    weight.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
   }
 }
 

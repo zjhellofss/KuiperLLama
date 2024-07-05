@@ -36,12 +36,22 @@ class LLama2Model : public Model {
 
   base::Status init(base::DeviceType device_type) override;
 
-  base::Status forward(const std::vector<int>& tokens, int32_t total_steps) override;
+  base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
+                       bool is_prompt, int& next) override;
 
   std::vector<int32_t> encode(const std::string& sentence) const override;
 
+  int32_t get_eos() override;
+
+  std::string decode(int32_t token_idx) const override;
+
   std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
                                                            int32_t token_pos) const override;
+
+  op::EmbeddingOutput embedding(const std::vector<int>& tokens) const;
+
+  tensor::Tensor fill_input(const tensor::Tensor& pos_tensor,
+                            const op::EmbeddingOutput& embedding_output, bool is_prompt) const;
 
  private:
   void init_mem() override;
@@ -54,22 +64,15 @@ class LLama2Model : public Model {
 
   void attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
-  op::EmbeddingOutput embedding(const std::vector<int>& tokens) const;
-
   void attention_rms(int32_t layer_idx, const tensor::Tensor& input) const;
 
   void feed_forward(int32_t layer_idx, const tensor::Tensor& input) const;
-
-  void fill_input(int32_t next, const tensor::Tensor& pos_tensor,
-                  const std::vector<int32_t>& tokens, tensor::Tensor& input,
-                  const op::EmbeddingOutput& embedding_output) const;
 
   void attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
   void cls_logits(const tensor::Tensor& input) const;
 
-  std::string post_processing(int32_t pos, int32_t& next,
-                              const std::vector<int32_t>& tokens) const override;
+  int32_t post_processing(const tensor::Tensor& pos, bool is_prompt) const override;
 
  private:
   std::shared_ptr<kernel::CudaConfig> cuda_config_;

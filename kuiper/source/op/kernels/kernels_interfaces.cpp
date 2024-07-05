@@ -6,17 +6,18 @@
 #include "cpu/rmsnorm_kernel.h"
 #include "cpu/rope_kernel.h"
 #include "cpu/scale_kernel.h"
+#include "cpu/scale_sum_kernel.h"
 #include "cpu/softmax_kernel.h"
 #include "cpu/swiglu_kernel.h"
-#include "cpu/scale_sum_kernel.h"
 #include "cuda/add_kernel.cuh"
 #include "cuda/matmul_kernel.cuh"
+#include "cuda/mha_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
 #include "cuda/rope_kernel.cuh"
 #include "cuda/scale_kernel.cuh"
+#include "cuda/scale_sum_kernel.cuh"
 #include "cuda/softmax_kernel.cuh"
 #include "cuda/swiglu_kernel.cuh"
-#include "cuda/scale_sum_kernel.cuh"
 #include "kernels_interface.h"
 namespace kernel {
 AddKernel get_add_kernel(base::DeviceType device_type) {
@@ -31,8 +32,7 @@ AddKernel get_add_kernel(base::DeviceType device_type) {
 }
 
 EmbeddingKernel get_emb_kernel(base::DeviceType device_type) {
-  if (device_type == base::DeviceType::kDeviceCPU ||
-      device_type == base::DeviceType::kDeviceCUDA) {
+  if (device_type == base::DeviceType::kDeviceCPU || device_type == base::DeviceType::kDeviceCUDA) {
     return emb_kernel_normal;
   } else {
     LOG(FATAL) << "Unknown device type for get an embedding kernel.";
@@ -52,9 +52,10 @@ MatmulKernel get_matmul_kernel(base::DeviceType device_type) {
 }
 
 MHAKernel get_mha_kernel(base::DeviceType device_type) {
-  if (device_type == base::DeviceType::kDeviceCPU ||
-      device_type == base::DeviceType::kDeviceCUDA) {
+  if (device_type == base::DeviceType::kDeviceCPU) {
     return mha_kernel;
+  } else if (device_type == base::DeviceType::kDeviceCUDA) {
+    return mha_kernel_cu;
   } else {
     LOG(FATAL) << "Unknown device type for get an mha kernel.";
     return nullptr;

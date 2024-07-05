@@ -1,4 +1,6 @@
 #include "tensor/tensor.h"
+#include <cuda_device_runtime_api.h>
+#include <cuda_runtime.h>
 #include <glog/logging.h>
 #include <numeric>
 
@@ -99,7 +101,7 @@ Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_al
   }
 }
 
-void Tensor::to_cuda() {
+void Tensor::to_cuda(cudaStream_t stream, int u) {
   CHECK_NE(buffer_, nullptr);
   const base::DeviceType device_type = this->device_type();
   if (device_type == base::DeviceType::kDeviceUnknown) {
@@ -108,8 +110,8 @@ void Tensor::to_cuda() {
     size_t byte_size = this->byte_size();
     auto cu_alloc = base::CUDADeviceAllocatorFactory::get_instance();
     auto cu_buffer = std::make_shared<base::Buffer>(byte_size, cu_alloc);
-    cu_alloc->memcpy(buffer_->ptr(), cu_buffer->ptr(), byte_size,
-                     base::MemcpyKind::kMemcpyCPU2CUDA);
+    cu_alloc->memcpy(buffer_->ptr(), cu_buffer->ptr(), byte_size, base::MemcpyKind::kMemcpyCPU2CUDA,
+                     stream);
     this->buffer_ = cu_buffer;
   } else {
     LOG(INFO) << "The device type of the tensor is already cpu.";
@@ -198,7 +200,7 @@ bool Tensor::allocate(std::shared_ptr<base::DeviceAllocator> allocator, bool nee
 
 const std::vector<int32_t>& Tensor::dims() const { return this->dims_; }
 
-void Tensor::set_device_type(base::DeviceType device_type) {
+void Tensor::set_device_type(base::DeviceType device_type) const {
   if (buffer_) {
     buffer_->set_device_type(device_type);
   }

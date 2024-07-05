@@ -126,7 +126,7 @@ base::Status Model::generate_model_infos(const ModelConfig& config) const {
   config_->hidden_dim_ = config.hidden_dim;
   config_->layer_num_ = config.layer_num;
   config_->head_num_ = config.head_num;
-  config_->kv_head_num_ = config.head_num;
+  config_->kv_head_num_ = config.kv_head_num;
   config_->seq_len_ = config.seq_len;
 
   config_->kv_dim_ = (config.dim * config.kv_head_num) / config.head_num;
