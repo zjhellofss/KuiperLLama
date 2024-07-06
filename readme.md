@@ -1,4 +1,9 @@
 # 自制大模型推理框架
+**🙋🙋🙋 自制大模型推理框架，火热进行中，请加下方微信了解**。
+
+> 带你从零写一个支持LLama推理，支持Cuda加速的大模型框架
+
+<img src="imgs/me.jpg" width="30%" height="30%">
 
 ## 第三方依赖
 1. google glog https://github.com/google/glog
