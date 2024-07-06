@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
   const char* checkpoint_path = argv[1];  // e.g. out/model.bin
   const char* tokenizer_path = argv[2];
   model::LLama2Model model(tokenizer_path, checkpoint_path);
-  auto init_status = model.init(base::DeviceType::kDeviceCPU);
+  auto init_status = model.init(base::DeviceType::kDeviceCUDA);
   if (!init_status) {
     LOG(FATAL) << "The model init failed, the error code is: " << init_status.get_err_code();
   }

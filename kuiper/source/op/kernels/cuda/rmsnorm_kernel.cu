@@ -1,5 +1,4 @@
 #include <cub/block/block_reduce.cuh>
-#include <cub/warp/warp_reduce.cuh>
 #include "rmsnorm_kernel.cuh"
 namespace kernel {
 template<int32_t BLOCK_DIM>
