@@ -64,7 +64,7 @@ TEST(test_add_cu, add_align1) {
   set_value_cu(static_cast<float*>(t1.get_buffer()->ptr()), size, 2.1f);
   set_value_cu(static_cast<float*>(t2.get_buffer()->ptr()), size, 3.3f);
 
-  kernel::get_add_kernel(base::DeviceType::kDeviceCUDA)(1.f, t1, 1.f, t2, out, nullptr);
+  kernel::get_add_kernel(base::DeviceType::kDeviceCUDA)( t1, t2, out, nullptr);
   cudaDeviceSynchronize();
   float* output = new float[size];
   cudaMemcpy(output, out.ptr<float>(), size * sizeof(float), cudaMemcpyDeviceToHost);

@@ -24,9 +24,9 @@ TEST(test_swiglu_cu, swiglu_nostream) {
   tensor::Tensor in_cu = in_cpu.clone();
   tensor::Tensor wei_cu = wei_cpu.clone();
   tensor::Tensor out_cu = out_cpu.clone();
-  in_cu.to_cuda();
-  wei_cu.to_cuda();
-  out_cu.to_cuda();
+  in_cu.to_cuda(nullptr);
+  wei_cu.to_cuda(nullptr);
+  out_cu.to_cuda(nullptr);
 
   kernel::get_swiglu_kernel(base::DeviceType::kDeviceCUDA)(in_cu, wei_cu, out_cu,
                                                            nullptr);
@@ -61,9 +61,9 @@ TEST(test_swiglu_cu, swiglu_stream) {
   tensor::Tensor in_cu = in_cpu.clone();
   tensor::Tensor wei_cu = wei_cpu.clone();
   tensor::Tensor out_cu = out_cpu.clone();
-  in_cu.to_cuda();
-  wei_cu.to_cuda();
-  out_cu.to_cuda();
+  in_cu.to_cuda(nullptr);
+  wei_cu.to_cuda(nullptr);
+  out_cu.to_cuda(nullptr);
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 

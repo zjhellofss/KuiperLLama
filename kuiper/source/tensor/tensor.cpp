@@ -101,7 +101,7 @@ Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_al
   }
 }
 
-void Tensor::to_cuda(cudaStream_t stream, int u) {
+void Tensor::to_cuda(cudaStream_t stream) {
   CHECK_NE(buffer_, nullptr);
   const base::DeviceType device_type = this->device_type();
   if (device_type == base::DeviceType::kDeviceUnknown) {
@@ -273,9 +273,7 @@ void Tensor::init_buffer(std::shared_ptr<base::DeviceAllocator> alloc, base::Dat
         std::make_shared<base::Buffer>(data_type_size(data_type) * size_, nullptr, ptr, true);
     this->buffer_ = buffer;
   } else {
-    std::shared_ptr<base::Buffer> buffer =
-        std::make_shared<base::Buffer>(data_type_size(data_type) * size_, alloc, nullptr, false);
-    this->buffer_ = buffer;
+    allocate(alloc, true);
   }
 }
 }  // namespace tensor

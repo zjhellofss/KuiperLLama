@@ -32,7 +32,7 @@ class Tensor {
 
   void to_cpu();
 
-  void to_cuda(cudaStream_t stream, int u = 31);
+  void to_cuda(cudaStream_t stream = nullptr);
 
   bool is_empty() const;
 

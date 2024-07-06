@@ -27,8 +27,8 @@ TEST(test_rope_cu, rope_nostream) {
 
   tensor::Tensor input_q_gpu = input_q_cpu.clone();
   tensor::Tensor input_k_gpu = input_k_cpu.clone();
-  input_q_gpu.to_cuda();
-  input_k_gpu.to_cuda();
+  input_q_gpu.to_cuda(nullptr);
+  input_k_gpu.to_cuda(nullptr);
 
   kernel::get_rope_kernel(base::DeviceType::kDeviceCPU)(
       dim, kv_dim, head_size, input_q_cpu, input_k_cpu, input_pos, nullptr);
@@ -70,8 +70,8 @@ TEST(test_rope_cu, rope_nostream2) {
 
   tensor::Tensor input_q_gpu = input_q_cpu.clone();
   tensor::Tensor input_k_gpu = input_k_cpu.clone();
-  input_q_gpu.to_cuda();
-  input_k_gpu.to_cuda();
+  input_q_gpu.to_cuda(nullptr);
+  input_k_gpu.to_cuda(nullptr);
 
   kernel::get_rope_kernel(base::DeviceType::kDeviceCPU)(
       dim, kv_dim, head_size, input_q_cpu, input_k_cpu, input_pos, nullptr);
@@ -114,8 +114,8 @@ TEST(test_rope_cu, rope_stream1) {
 
   tensor::Tensor input_q_gpu = input_q_cpu.clone();
   tensor::Tensor input_k_gpu = input_k_cpu.clone();
-  input_q_gpu.to_cuda();
-  input_k_gpu.to_cuda();
+  input_q_gpu.to_cuda(nullptr);
+  input_k_gpu.to_cuda(nullptr);
 
   kernel::get_rope_kernel(base::DeviceType::kDeviceCPU)(
       dim, kv_dim, head_size, input_q_cpu, input_k_cpu, input_pos, nullptr);

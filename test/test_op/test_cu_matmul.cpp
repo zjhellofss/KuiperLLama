@@ -28,8 +28,8 @@ TEST(test_matmul_cu, matmul_nostream) {
   for (int i = 3; i <= 14; ++i) {
     t2_cpu.index<float>(i - 3) = float(i);
   }
-  t1_cpu.to_cuda();
-  t2_cpu.to_cuda();
+  t1_cpu.to_cuda(nullptr);
+  t2_cpu.to_cuda(nullptr);
 
   tensor::Tensor out(base::DataType::kDataTypeFp32, 2, 4, true, alloc_cu);
   cublasHandle_t handle;
@@ -72,8 +72,8 @@ TEST(test_matmul_cu, matmul_linear_nostream) {
   for (int i = 3; i <= 5; ++i) {
     t2_cpu.index<float>(i - 3) = float(i);
   }
-  t1_cpu.to_cuda();
-  t2_cpu.to_cuda();
+  t1_cpu.to_cuda(nullptr);
+  t2_cpu.to_cuda(nullptr);
 
   tensor::Tensor out(base::DataType::kDataTypeFp32, 2, 1, true, alloc_cu);
   cublasHandle_t handle;
@@ -111,8 +111,8 @@ TEST(test_matmul_cu, matmul_linear_nostream2) {
   for (int i = 3; i <= 5; ++i) {
     t2_cpu.index<float>(i - 3) = float(i);
   }
-  t1_cpu.to_cuda();
-  t2_cpu.to_cuda();
+  t1_cpu.to_cuda(nullptr);
+  t2_cpu.to_cuda(nullptr);
 
   tensor::Tensor out(base::DataType::kDataTypeFp32, 2, true, alloc_cu);
   cublasHandle_t handle;
@@ -150,8 +150,8 @@ TEST(test_matmul_cu, matmul_linear_nostream3) {
   for (int i = 3; i <= 5; ++i) {
     t2_cpu.index<float>(i - 3) = float(i);
   }
-  t1_cpu.to_cuda();
-  t2_cpu.to_cuda();
+  t1_cpu.to_cuda(nullptr);
+  t2_cpu.to_cuda(nullptr);
 
   tensor::Tensor out(base::DataType::kDataTypeFp32, 2, 1, true, alloc_cu);
   cublasHandle_t handle;
@@ -188,8 +188,8 @@ TEST(test_matmul_cu, matmul_linear_stream5) {
   tensor::Tensor input_cpu = input.clone();
   tensor::Tensor weight_cpu = weight.clone();
 
-  input.to_cuda();
-  weight.to_cuda();
+  input.to_cuda(nullptr);
+  weight.to_cuda(nullptr);
 
   tensor::Tensor out_cu(base::DataType::kDataTypeFp32, 4, true, alloc_cu);
   tensor::Tensor out_cpu(base::DataType::kDataTypeFp32, 4, true, alloc_cpu);
@@ -231,8 +231,8 @@ TEST(test_matmul_cu, matmul_linear_stream7) {
   tensor::Tensor input_cpu = input.clone();
   tensor::Tensor weight_cpu = weight.clone();
 
-  input.to_cuda();
-  weight.to_cuda();
+  input.to_cuda(nullptr);
+  weight.to_cuda(nullptr);
 
   tensor::Tensor out_cu(base::DataType::kDataTypeFp32, 6, true, alloc_cu);
   tensor::Tensor out_cpu(base::DataType::kDataTypeFp32, 6, true, alloc_cpu);
@@ -275,8 +275,8 @@ TEST(test_matmul_cu, matmul_linear_stream1) {
   for (int i = 3; i <= 6; ++i) {
     t2_cpu.index<float>(i - 3) = float(i);
   }
-  t1_cpu.to_cuda();
-  t2_cpu.to_cuda();
+  t1_cpu.to_cuda(nullptr);
+  t2_cpu.to_cuda(nullptr);
 
   tensor::Tensor out(base::DataType::kDataTypeFp32, 2, 1, true, alloc_cu);
   cublasHandle_t handle;
@@ -319,8 +319,8 @@ TEST(test_matmul_cu, matmul_linear_stream2) {
   for (int i = 3; i <= 11; ++i) {
     t2_cpu.index<float>(i - 3) = float(i);
   }
-  t1_cpu.to_cuda();
-  t2_cpu.to_cuda();
+  t1_cpu.to_cuda(nullptr);
+  t2_cpu.to_cuda(nullptr);
 
   tensor::Tensor out(base::DataType::kDataTypeFp32, 2, 3, true, alloc_cu);
   cublasHandle_t handle;
