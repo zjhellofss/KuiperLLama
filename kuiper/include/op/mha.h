@@ -12,6 +12,7 @@ class MultiHeadAttention : public op::Layer {
   base::Status check() const override;
 
   void set_pos(int32_t pos);
+  void set_layer_idx(int32_t layer_idx);
 
   base::Status forward() override;
 
