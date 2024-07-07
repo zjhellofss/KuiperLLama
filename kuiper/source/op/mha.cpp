@@ -38,7 +38,7 @@ base::Status MultiHeadAttention::forward() {
 }
 
 void MultiHeadAttention::set_pos(int32_t pos) { this->pos_ = pos; }
-
+void MultiHeadAttention::set_layer_idx(int32_t layer_idx) { this->layer_index_ = layer_idx; }
 base::Status MultiHeadAttention::check() const {
   base::Status status;
   const int32_t input_tensor_num = 4;

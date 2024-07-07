@@ -37,6 +37,7 @@ void LLama2Layers::to_cuda(std::shared_ptr<kernel::CudaConfig> config) {
     if (mha_layer) {
       mha_layer->set_cuda_config(config);
       mha_layer->to_cuda();
+      break;
     }
   }
 
@@ -151,10 +152,11 @@ void LLama2Model::create_nonparam_layers() {
   llama_layers_->rope_layer_ = std::make_shared<op::RoPELayer>(
       device_type_, config_->dim_, config_->kv_dim_, config_->head_size_);
 
-  for (int32_t i = 0; i < config_->layer_num_; ++i) {
-    auto mha_layer = std::make_shared<op::MultiHeadAttention>(
-        device_type_, i, config_->kv_mul_, config_->kv_dim_, config_->seq_len_, config_->head_num_,
+  //mha复用
+  auto mha_layer = std::make_shared<op::MultiHeadAttention>(
+        device_type_, 0, config_->kv_mul_, config_->kv_dim_, config_->seq_len_, config_->head_num_,
         config_->head_size_);
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
     llama_layers_->mha_layers_.push_back(mha_layer);
   }
 
@@ -329,9 +331,10 @@ void LLama2Model::init_mem() {
   std::shared_ptr<base::DeviceAllocator> alloc_cu =
       base::CUDADeviceAllocatorFactory::get_instance();
   int32_t max_seq_len = config_->seq_len_;
-  tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, static_cast<int32_t>(max_seq_len),
+  // 减少开销
+  tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, static_cast<int32_t>(1),
                               true, alloc_cpu);
-  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, max_seq_len, config_->dim_, true,
+  tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, 1, config_->dim_, true,
                                   alloc);
 
   CHECK(insert_buffer(ModelBufferType::kInputTokens, input_tokens));
@@ -487,7 +490,10 @@ base::Status LLama2Model::create_layers() {
 op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const {
   auto input_tokens = get_buffer(ModelBufferType::kInputTokens);
   auto input_embeddings = get_buffer(ModelBufferType::kInputEmbeddings);
-  input_tokens.reshape({static_cast<int32_t>(tokens.size())});
+  if (input_tokens.size()!=tokens.size())
+  {  
+    input_tokens.reshape({static_cast<int32_t>(tokens.size())});
+    input_embeddings.reshape({static_cast<int32_t>(tokens.size()),config_->dim_});}
   for (int32_t i = 0; i < tokens.size(); ++i) {
     input_tokens.index<int32_t>(i) = tokens.at(i);
   }
@@ -581,6 +587,8 @@ void LLama2Model::attention_mha(int32_t layer_idx, const tensor::Tensor& pos_ten
   CHECK_NE(mha_layer, nullptr) << "The multi head attention layer is null pointer.";
   int pos = pos_tensor.index<int32_t>(0);
   std::dynamic_pointer_cast<op::MultiHeadAttention>(mha_layer)->set_pos(pos);
+  // 因为复用mha，手动设置layer_index_
+  std::dynamic_pointer_cast<op::MultiHeadAttention>(mha_layer)->set_layer_idx(layer_idx);
   STATUS_CHECK(mha_layer->forward(query, score_storage, key_cache, val_cache, mha_output));
 
   // wo @ attention output

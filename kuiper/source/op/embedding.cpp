@@ -36,7 +36,7 @@ base::Status EmbeddingLayer::check() const {
     return status;
   }
 
-  status = check_tensor_with_dim(get_output(0), device_type_, data_type_, seq_len_, dim_);
+  status = check_tensor_with_dim(get_output(0), device_type_, data_type_, token_size, dim_);
   if (!status) {
     LOG(ERROR) << "The output tensor error in the embedding layer.";
     return status;
