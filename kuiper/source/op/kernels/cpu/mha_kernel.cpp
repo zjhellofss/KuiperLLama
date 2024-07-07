@@ -8,30 +8,33 @@ void mha_kernel(int32_t pos, int32_t head_num, int32_t layer_index, int32_t seq_
                 const tensor::Tensor& key_cache_tensor, const tensor::Tensor& value_cache_tensor,
                 base::DeviceType device_type, CudaConfig* config) {
   int32_t layer_offset = layer_index * seq_len * kv_dim;
-  for (int32_t h = 0; h < head_num; ++h) {
-    float* score_head_addr = const_cast<float*>(score_tensor.ptr<float>() + h * seq_len);
-    float* query_head_addr = const_cast<float*>(query_tensor.ptr<float>() + h * head_size);
+  float scale = 1.f / std::sqrt(static_cast<float>(head_size));
 
-    std::shared_ptr<base::DeviceAllocator> allocator;
+  std::shared_ptr<base::DeviceAllocator> allocator;
     if (device_type == base::DeviceType::kDeviceCPU) {
       allocator = base::CPUDeviceAllocatorFactory::get_instance();
     } else {
       allocator = base::CUDADeviceAllocatorFactory::get_instance();
     }
+  for (int32_t h = 0; h < head_num; ++h) {
+    float* score_head_addr = const_cast<float*>(score_tensor.ptr<float>() + h * seq_len);
+    float* query_head_addr = const_cast<float*>(query_tensor.ptr<float>() + h * head_size);
 
+    
+    tensor::Tensor query_mat(base::DataType::kDataTypeFp32, head_size, false, nullptr,
+                               query_head_addr);
+    query_mat.set_device_type(device_type);
+    
     for (int32_t t = 0; t <= pos; t++) {
       int32_t cache_offset = t * kv_dim + (h / kv_mul) * head_size;
       const float* key_head_addr = key_cache_tensor.ptr<float>() + layer_offset + cache_offset;
       tensor::Tensor key_mat(base::DataType::kDataTypeFp32, 1, head_size, false, nullptr,
                              const_cast<float*>(key_head_addr));
-      tensor::Tensor query_mat(base::DataType::kDataTypeFp32, head_size, false, nullptr,
-                               query_head_addr);
+      
       tensor::Tensor score_mat(base::DataType::kDataTypeFp32, 1, false, nullptr,
                                score_head_addr + t);
       key_mat.set_device_type(device_type);
-      query_mat.set_device_type(device_type);
       score_mat.set_device_type(device_type);
-      float scale = 1.f / std::sqrt(static_cast<float>(head_size));
       get_matmul_kernel(device_type)(query_mat, key_mat, score_mat, scale, config);
     }
 
