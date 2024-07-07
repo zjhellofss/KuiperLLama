@@ -12,8 +12,8 @@ struct LLama2Layers {
   std::shared_ptr<op::Layer> add_layer_;
   std::shared_ptr<op::Layer> rope_layer_;
   std::shared_ptr<op::Layer> swiglu_layer_;
+  std::shared_ptr<op::Layer> mha_layer_;
 
-  std::vector<std::shared_ptr<op::Layer>> mha_layers_;
   std::vector<std::shared_ptr<op::Layer>> wq_layers_;
   std::vector<std::shared_ptr<op::Layer>> wk_layers_;
   std::vector<std::shared_ptr<op::Layer>> wv_layers_;
