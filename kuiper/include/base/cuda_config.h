@@ -4,12 +4,8 @@
 #include <cuda_runtime_api.h>
 namespace kernel {
 struct CudaConfig {
-  cublasHandle_t handle = nullptr;
   cudaStream_t stream = nullptr;
   ~CudaConfig() {
-    if (handle) {
-      cublasDestroy(handle);
-    }
     if (stream) {
       cudaStreamDestroy(stream);
     }

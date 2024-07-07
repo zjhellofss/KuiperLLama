@@ -111,7 +111,6 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
     cudaSetDevice(0);
     cuda_config_ = std::make_shared<kernel::CudaConfig>();
     cudaStreamCreate(&cuda_config_->stream);
-    cublasCreate(&cuda_config_->handle);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
       return error::InternalError("The cuda hanle create failed.");
