@@ -10,6 +10,7 @@
 #include "cpu/softmax_kernel.h"
 #include "cpu/swiglu_kernel.h"
 #include "cuda/add_kernel.cuh"
+#include "cuda/emb_kernel.cuh"
 #include "cuda/matmul_kernel.cuh"
 #include "cuda/mha_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
@@ -29,8 +30,10 @@ AddKernel get_add_kernel(base::DeviceType device_type) {
 }
 
 EmbeddingKernel get_emb_kernel(base::DeviceType device_type) {
-  if (device_type == base::DeviceType::kDeviceCPU || device_type == base::DeviceType::kDeviceCUDA) {
+  if (device_type == base::DeviceType::kDeviceCPU) {
     return emb_kernel_normal;
+  } else if (device_type == base::DeviceType::kDeviceCUDA) {
+    return emb_kernel_cu;
   } else {
     LOG(FATAL) << "Unknown device type for get an embedding kernel.";
     return nullptr;
@@ -113,7 +116,7 @@ RMSNormKernel get_rmsnorm_kernel(base::DeviceType device_type) {
 ScaleSumKernel get_scale_sum_kernel(base::DeviceType device_type) {
   if (device_type == base::DeviceType::kDeviceCPU) {
     return scale_sum_kernel_cpu;
-  }  else {
+  } else {
     LOG(FATAL) << "Unknown device type for get a scale and reduce kernel.";
     return nullptr;
   }

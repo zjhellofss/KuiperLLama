@@ -325,8 +325,7 @@ void LLama2Model::init_mem() {
       base::CUDADeviceAllocatorFactory::get_instance();
   int32_t max_seq_len = config_->seq_len_;
   // 减少开销
-  tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, static_cast<int32_t>(1), true,
-                              alloc_cpu);
+  tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, 1, true, alloc_cpu);
   tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, 1, config_->dim_, true, alloc);
 
   CHECK(insert_buffer(ModelBufferType::kInputTokens, input_tokens));

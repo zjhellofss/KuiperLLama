@@ -54,8 +54,9 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
   float* query_head = query + head * head_size;
   float* score_head = score_ptr + head * seq_len;
   float scale = 1.f / sqrtf(head_size);
+  int32_t head_offset = (head / kv_mul) * head_size;
   for (int t = threadIdx.x; t <= pos; t += blockDim.x) {
-    float* key_head = key_cache + layer_offset + t * kv_dim + (head / kv_mul) * head_size;
+    float* key_head = key_cache + layer_offset + t * kv_dim + head_offset;
 
     float score = 0.0f;
     for (int i = 0; i < head_size; ++i) {
@@ -73,9 +74,10 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
   float* output_head = output + head * head_size;
   for (int i = threadIdx.x; i < head_size; i += blockDim.x) {
     float value = 0.0f;
+    int32_t head_offset = layer_offset + (head / kv_mul) * head_size;
 #pragma unroll
     for (int t = 0; t <= pos; t++) {
-      float* value_head = value_cache + layer_offset + t * kv_dim + (head / kv_mul) * head_size;
+      float* value_head = value_cache + head_offset + t * kv_dim;
       float score = score_head[t];
       value += score * value_head[i];
     }

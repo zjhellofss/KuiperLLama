@@ -4,7 +4,7 @@
 namespace kernel {
 
 template <int THREAD_PER_BLOCK, int ROW_PER_BLOCK>
-__global__ void matmul_kernel_cu_fp32(const float* input, const float* weight, float* C, int M,
+__global__ void matmul_kernel_cu_fp32(const float* input, const float* weight, float* output, int M,
                                       int K) {
   __shared__ float sdata[THREAD_PER_BLOCK];
   unsigned int tid = threadIdx.x;
@@ -28,7 +28,7 @@ __global__ void matmul_kernel_cu_fp32(const float* input, const float* weight, f
     }
 
     if (tid == 0) {
-      C[p] = sdata[0];
+      output[p] = sdata[0];
     }
     __syncthreads();
   }
