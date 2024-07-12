@@ -22,7 +22,7 @@ base::Status BaseLayer::set_weight(int32_t idx, const tensor::Tensor& weight) {
 }
 
 base::Status BaseLayer::set_weight(int32_t idx, const std::vector<int32_t>& dims,
-                                   const float* weight_ptr, base::DeviceType device_type) {
+                                   const void* weight_ptr, base::DeviceType device_type) {
   return base::error::FunctionNotImplement();
 }
 
@@ -150,11 +150,11 @@ size_t Layer::input_size() const { return inputs_.size(); }
 
 size_t Layer::output_size() const { return outputs_.size(); }
 
-LayerFp32Param::LayerFp32Param(base::DeviceType device_type, LayerType layer_type,
-                               std::string layer_name)
-    : Layer(device_type, layer_type, std::move(layer_name)) {}
+LayerParam::LayerParam(base::DeviceType device_type, LayerType layer_type, bool is_quant_layer,
+                       std::string layer_name)
+    : Layer(device_type, layer_type, std::move(layer_name)), is_quant_layer_(is_quant_layer) {}
 
-base::Status LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weight) {
+base::Status LayerParam::set_weight(int32_t idx, const tensor::Tensor& weight) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   CHECK(weight.data_type() == base::DataType::kDataTypeFp32);
@@ -165,21 +165,24 @@ base::Status LayerFp32Param::set_weight(int32_t idx, const tensor::Tensor& weigh
   return base::error::Success();
 }
 
-const tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) const {
+const tensor::Tensor& LayerParam::get_weight(int32_t idx) const {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   return weights_.at(idx);
 }
 
-void LayerFp32Param::to_cuda() {
+void LayerParam::to_cuda() {
   Layer::to_cuda();
   for (auto& weight : weights_) {
     weight.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
   }
+  if (!scales_.is_empty()) {
+    scales_.to_cuda(cuda_config_ ? cuda_config_->stream : nullptr);
+  }
 }
 
-base::Status LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>& dims,
-                                        const float* weight_ptr, base::DeviceType device_type) {
+base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dims,
+                                    const void* weight_ptr, base::DeviceType device_type) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   CHECK_NE(weight_ptr, nullptr);
@@ -191,16 +194,45 @@ base::Status LayerFp32Param::set_weight(int32_t idx, const std::vector<int32_t>&
     buffer->set_device_type(device_type);
   }
 
-  tensor::Tensor weight(base::DataType::kDataTypeFp32, dims);
-  weight.set_device_type(device_type);
-  CHECK(weight.assign(buffer));
-  weights_.at(idx) = weight;
+  if (!is_quant_layer_) {
+    tensor::Tensor weight(base::DataType::kDataTypeFp32, dims);
+    weight.set_device_type(device_type);
+    CHECK(weight.assign(buffer));
+    weights_.at(idx) = weight;
+  } else {
+    // is quant layer
+    tensor::Tensor weight(base::DataType::kDataTypeInt8, dims);
+    weight.set_device_type(device_type);
+    CHECK(weight.assign(buffer));
+    weights_.at(idx) = weight;
+
+    const int32_t weight_size = static_cast<int32_t>(weight.size());
+    CHECK(weight_size % group_size_ == 0);
+
+    int32_t scale_nums = weight_size / group_size_;
+    scales_ = tensor::Tensor{base::DataType::kDataTypeFp32, scale_nums, false, nullptr,
+                             reinterpret_cast<float*>((int8_t*)weight_ptr + weight_size)};
+    scales_.set_device_type(device_type);
+  }
+
   return base::error::Success();
 }
 
-void LayerFp32Param::reset_weight_size(size_t size) { weights_.resize(size); }
+void LayerParam::set_scales(const tensor::Tensor& scales) {
+  CHECK(!scales.is_empty());
+  this->scales_ = scales;
+}
 
-size_t LayerFp32Param::weight_size() const { return weights_.size(); }
+void LayerParam::set_group_size(int32_t group_size) { this->group_size_ = group_size; }
+
+int32_t LayerParam::get_scale_num() const {
+  CHECK(!scales_.is_empty());
+  return static_cast<int32_t>(scales_.size());
+}
+
+void LayerParam::reset_weight_size(size_t size) { weights_.resize(size); }
+
+size_t LayerParam::weight_size() const { return weights_.size(); }
 
 base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& output1) {
   this->set_input(0, input1);
@@ -252,7 +284,7 @@ base::Status Layer::forward(const tensor::Tensor& input1, const tensor::Tensor& 
   return this->forward();
 }
 
-tensor::Tensor& LayerFp32Param::get_weight(int32_t idx) {
+tensor::Tensor& LayerParam::get_weight(int32_t idx) {
   CHECK_GE(idx, 0);
   CHECK_LT(idx, weights_.size());
   return weights_.at(idx);

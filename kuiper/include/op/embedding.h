@@ -9,7 +9,7 @@ struct EmbeddingOutput {
   tensor::Tensor input_token_num;
 };
 
-class EmbeddingLayer : public LayerFp32Param {
+class EmbeddingLayer : public LayerParam {
  public:
   explicit EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_t seq_len,
                           int32_t vocab_size);

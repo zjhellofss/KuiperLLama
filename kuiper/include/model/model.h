@@ -3,54 +3,18 @@
 #include <map>
 #include <string>
 #include "config.h"
-#include "op/add.h"
-#include "op/embedding.h"
 #include "op/encode.h"
 #include "op/layer.h"
-#include "op/matmul.h"
-#include "op/mha.h"
-#include "op/rmsnorm.h"
-#include "op/rope.h"
+#include "raw_model_data.h"
 #include "sampler/argmax_sampler.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
 
 namespace model {
-enum class ModelBufferType {
-  kInputTokens = 0,
-  kInputEmbeddings = 1,
-  kOutputRMSNorm = 2,
-  kKeyCache = 3,
-  kValueCache = 4,
-  kQuery = 5,
-  kInputPos = 6,
-  kScoreStorage = 7,
-  kOutputMHA = 8,
-  kAttnOutput = 9,
-  kW1Output = 10,
-  kW2Output = 11,
-  kW3Output = 12,
-  kFFNRMSNorm = 13,
-  kForwardOutput = 15,
-  kForwardOutputCPU = 16,
-};
-
-struct RawModelData {
-  int32_t fd = -1;
-  size_t file_size = 0;
-  float* data = nullptr;
-  float* weight_data = nullptr;
-
-  ~RawModelData();
-
-  const float* weight(size_t offset) const;
-
-  bool is_weight_valid(size_t peek) const;
-};
-
 class Model {
  public:
-  explicit Model(base::ModelType model_type, std::string token_path, std::string model_path);
+  explicit Model(base::ModelType model_type, std::string token_path, std::string model_path,
+                 bool is_quant_model);
 
   virtual base::Status init(base::DeviceType device_type) = 0;
 
@@ -98,7 +62,11 @@ class Model {
 
   virtual void create_nonparam_layers() = 0;
 
+  virtual void create_param_quant_layers() = 0;
+
  protected:
+  int32_t group_size_ = 1;
+  bool is_quant_model_ = false;
   std::unique_ptr<TransformerConfig> config_;
 
   std::string token_path_;

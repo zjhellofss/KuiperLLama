@@ -15,8 +15,7 @@ base::Status SwiGLULayer::check() const {
   for (int32_t i = 0; i < input_tensor_num; ++i) {
     status = check_tensor_with_dim(get_input(0), device_type_, data_type_, hidden_dim_);
     if (!status) {
-      LOG(ERROR) << "The input tensor " << std::to_string(i)
-                 << " error in the swiglu layer.";
+      LOG(ERROR) << "The input tensor " << std::to_string(i) << " error in the swiglu layer.";
       return status;
     }
   }
@@ -40,8 +39,8 @@ base::Status SwiGLULayer::forward() {
   if (device_type_ == base::DeviceType::kDeviceCUDA) {
     CHECK(cuda_config_ != nullptr);
   }
-  kernel::get_swiglu_kernel(device_type_)(
-      input1, input2, output, cuda_config_ ? cuda_config_->stream : nullptr);
+  kernel::get_swiglu_kernel(device_type_)(input1, input2, output,
+                                          cuda_config_ ? cuda_config_->stream : nullptr);
   return base::error::Success();
 }
 

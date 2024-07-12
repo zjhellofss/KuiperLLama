@@ -2,15 +2,14 @@
 #include "base/alloc.h"
 namespace base {
 
-CUDADeviceAllocator::CUDADeviceAllocator() : DeviceAllocator(DeviceType::kDeviceCUDA) {
-}
+CUDADeviceAllocator::CUDADeviceAllocator() : DeviceAllocator(DeviceType::kDeviceCUDA) {}
 
 void* CUDADeviceAllocator::allocate(size_t byte_size) const {
   if (!byte_size) {
     return nullptr;
   }
   void* ptr = nullptr;
-  cudaError_t err = cudaMallocManaged(&ptr, byte_size);
+  cudaError_t err = cudaMalloc(&ptr, byte_size);
   CHECK_EQ(err, cudaSuccess);
   return ptr;
 }

@@ -8,7 +8,7 @@ EmbeddingLayer::EmbeddingLayer(base::DeviceType device_type, int32_t dim, int32_
     : dim_(dim),
       seq_len_(seq_len),
       vocab_size_(vocab_size),
-      LayerFp32Param(device_type, LayerType::kLayerEmbedding, "Embedding") {
+      LayerParam(device_type, LayerType::kLayerEmbedding, false, "Embedding") {
   reset_weight_size(1);
   reset_input_size(2);
   reset_output_size(1);
@@ -18,8 +18,7 @@ base::Status EmbeddingLayer::check() const {
   const auto& input_tensor = get_input(0);
   const auto& token_size = get_input(1).size();
   if (token_size > input_tensor.size()) {
-    return base::error::InvalidArgument(
-        "The number of input tensor is greater than seq len.");
+    return base::error::InvalidArgument("The number of input tensor is greater than seq len.");
   }
 
   base::Status status = check_tensor_with_dim(input_tensor, base::DeviceType::kDeviceCPU,
@@ -29,8 +28,7 @@ base::Status EmbeddingLayer::check() const {
     return status;
   }
 
-  status =
-      check_tensor_with_dim(get_weight(0), device_type_, data_type_, vocab_size_, dim_);
+  status = check_tensor_with_dim(get_weight(0), device_type_, data_type_, vocab_size_, dim_);
   if (!status) {
     LOG(ERROR) << "The weight tensor error in the embedding layer.";
     return status;
@@ -52,8 +50,7 @@ base::Status EmbeddingLayer::forward() {
   if (device_type_ == base::DeviceType::kDeviceCUDA) {
     CHECK(cuda_config_ != nullptr);
   }
-  kernel::get_emb_kernel(device_type_)(get_input(0), get_weight(0), get_output(0),
-                                       vocab_size_,
+  kernel::get_emb_kernel(device_type_)(get_input(0), get_weight(0), get_output(0), vocab_size_,
                                        cuda_config_ ? cuda_config_->stream : nullptr);
   return base::StatusCode::kSuccess;
 }

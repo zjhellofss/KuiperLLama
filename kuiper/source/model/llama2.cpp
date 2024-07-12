@@ -1,6 +1,9 @@
 #include "model/llama2.h"
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
+#include <op/matmul.h>
+#include <op/mha.h>
+#include <op/rmsnorm.h>
 #include <sentencepiece_processor.h>
 #include <utility>
 #include "base/tick.h"
@@ -95,13 +98,17 @@ void LLama2Layers::to_cuda(std::shared_ptr<kernel::CudaConfig> config) {
   }
 }
 
-LLama2Model::LLama2Model(std::string token_path, std::string model_path)
-    : Model(base::ModelType::kModelTypeLLama2, std::move(token_path), std::move(model_path)) {}
+LLama2Model::LLama2Model(std::string token_path, std::string model_path, bool is_quant_model)
+    : Model(base::ModelType::kModelTypeLLama2, std::move(token_path), std::move(model_path),
+            is_quant_model) {}
 
 base::Status LLama2Model::init(base::DeviceType device_type) {
   using namespace base;
   if (token_path_.empty()) {
     return error::PathNotValid(token_path_);
+  }
+  if (device_type == base::DeviceType::kDeviceCPU && is_quant_model_) {
+    return error::InternalError("The cpu device do not support int8 quant model.");
   }
 
   device_type_ = device_type;
@@ -128,6 +135,9 @@ base::Status LLama2Model::forward(const tensor::Tensor& input, const tensor::Ten
                                   bool is_prompt, int& next) {
   if (input.is_empty()) {
     return base::error::InvalidArgument("The input tensor is empty.");
+  }
+  if (device_type_ == base::DeviceType::kDeviceCPU && is_quant_model_) {
+    return base::error::InternalError("Unsupported int8 quant in the cpu device");
   }
 
   for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
@@ -159,14 +169,121 @@ void LLama2Model::create_nonparam_layers() {
       std::make_shared<op::SwiGLULayer>(device_type_, config_->hidden_dim_);
 }
 
+void LLama2Model::create_param_quant_layers() {
+  CHECK(is_quant_model_);
+  CHECK(llama_layers_ != nullptr);
+
+  size_t pos = 0;
+  int32_t dim = config_->dim_;
+  auto cpu_device_type = base::DeviceType::kDeviceCPU;
+
+  // query
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto wq = std::make_shared<op::MatmulLayer>(device_type_, dim, dim, true);
+    wq->set_group_size(group_size_);
+    wq->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->wq_layers_.push_back(wq);
+    pos = pos + dim * dim + wq->get_scale_num() * sizeof(float);
+  }
+
+  // key
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto wk = std::make_shared<op::MatmulLayer>(device_type_, config_->kv_dim_, dim, true);
+    wk->set_group_size(group_size_);
+    wk->set_weight(0, {config_->kv_dim_, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->wk_layers_.push_back(wk);
+    pos = pos + config_->kv_dim_ * dim + wk->get_scale_num() * sizeof(float);
+  }
+
+  // value
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto wv = std::make_shared<op::MatmulLayer>(device_type_, config_->kv_dim_, dim, true);
+    wv->set_group_size(group_size_);
+    wv->set_weight(0, {config_->kv_dim_, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->wv_layers_.push_back(wv);
+    pos += config_->kv_dim_ * dim + wv->get_scale_num() * sizeof(float);
+  }
+
+  // output
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto wo = std::make_shared<op::MatmulLayer>(device_type_, dim, dim, true);
+    wo->set_group_size(group_size_);
+    wo->set_weight(0, {dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->wo_layers_.push_back(wo);
+    pos = pos + dim * dim + wo->get_scale_num() * sizeof(float);
+  }
+
+  // w1 layers
+  int32_t hidden_dim = config_->hidden_dim_;
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto w1 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim, true);
+    w1->set_group_size(group_size_);
+    w1->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->w1_layers_.push_back(w1);
+    pos = pos + dim * hidden_dim + w1->get_scale_num() * sizeof(float);
+  }
+
+  // w2 layers
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto w2 = std::make_shared<op::MatmulLayer>(device_type_, dim, hidden_dim, true);
+    w2->set_group_size(group_size_);
+    w2->set_weight(0, {dim, hidden_dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->w2_layers_.push_back(w2);
+    pos = pos + dim * hidden_dim + w2->get_scale_num() * sizeof(float);
+  }
+
+  // w3 layers
+  for (int32_t i = 0; i < config_->layer_num_; ++i) {
+    auto w3 = std::make_shared<op::MatmulLayer>(device_type_, hidden_dim, dim, true);
+    w3->set_group_size(group_size_);
+    w3->set_weight(0, {hidden_dim, dim}, this->raw_model_data_->weight(pos), cpu_device_type);
+    llama_layers_->w3_layers_.push_back(w3);
+    pos = pos + dim * hidden_dim + w3->get_scale_num() * sizeof(float);
+  }
+
+  // wcls layer
+  auto cls_layer = std::make_shared<op::MatmulLayer>(device_type_, config_->vocab_size_, dim, true);
+  cls_layer->set_group_size(group_size_);
+  if (config_->is_shared_weight_) {
+    // using token embedding weight
+    cls_layer->set_weight(0, {config_->vocab_size_, dim}, this->raw_model_data_->weight(pos),
+                          cpu_device_type);
+  } else {
+    // no shared
+    cls_layer->set_weight(0, {config_->vocab_size_, dim}, this->raw_model_data_->weight(pos),
+                          cpu_device_type);
+    pos = pos + config_->vocab_size_ * dim + cls_layer->get_scale_num() * sizeof(float);
+  }
+  llama_layers_->cls_layer_ = cls_layer;
+
+  // embedding layer
+  float* weight_ptr = (float*)raw_model_data_->weight(pos);
+  llama_layers_->embedding_layer_ = std::make_shared<op::EmbeddingLayer>(
+      device_type_, config_->dim_, config_->seq_len_, std::abs(config_->vocab_size_));
+  llama_layers_->embedding_layer_->set_weight(0, {std::abs(config_->vocab_size_), dim}, weight_ptr,
+                                              cpu_device_type);
+  weight_ptr += config_->vocab_size_ * dim;
+
+  // rmsnorm attention attention,ffn,final
+  for (int32_t i = 0; i < 2 * config_->layer_num_ + 1; ++i) {
+    std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
+        std::make_shared<op::RmsNormLayer>(device_type_, dim);
+
+    rms_norm_layer->set_weight(0, {dim}, weight_ptr, cpu_device_type);
+    llama_layers_->rmsnorm_layers_.push_back(rms_norm_layer);
+    weight_ptr += dim;
+  }
+}
+
 void LLama2Model::create_param_layers() {
+  CHECK(!is_quant_model_);
   CHECK(llama_layers_ != nullptr);
   // The embedding layer
   auto cpu_device_type = base::DeviceType::kDeviceCPU;
   llama_layers_->embedding_layer_ = std::make_shared<op::EmbeddingLayer>(
       device_type_, config_->dim_, config_->seq_len_, std::abs(config_->vocab_size_));
 
-  const float* weight_embedding = raw_model_data_->weight(0);
+  const void* weight_embedding = raw_model_data_->weight(0);
   llama_layers_->embedding_layer_->set_weight(0, {std::abs(config_->vocab_size_), config_->dim_},
                                               weight_embedding, cpu_device_type);
 
@@ -255,10 +372,9 @@ void LLama2Model::create_param_layers() {
     std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
         std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
 
-    const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
+    const void* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
     rms_norm_layer->set_weight(0, {config_->dim_}, weight_rmsnorm, cpu_device_type);
     llama_layers_->rmsnorm_layers_.push_back(rms_norm_layer);
-
     rmsnorm_pos += config_->dim_;
   }
 
@@ -272,7 +388,7 @@ void LLama2Model::create_param_layers() {
   for (int32_t i = 0; i < config_->layer_num_; ++i) {
     std::shared_ptr<op::RmsNormLayer> rms_norm_layer =
         std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
-    const float* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
+    const void* weight_rmsnorm = raw_model_data_->weight(rmsnorm_pos);
     rms_norm_layer->set_weight(0, {config_->dim_}, weight_rmsnorm, cpu_device_type);
     llama_layers_->rmsnorm_layers_.push_back(rms_norm_layer);
 
@@ -286,7 +402,7 @@ void LLama2Model::create_param_layers() {
   std::shared_ptr<op::RmsNormLayer> rms_final_layer =
       std::make_shared<op::RmsNormLayer>(device_type_, config_->dim_);
 
-  const float* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
+  const void* weight_rmsnorm_final = raw_model_data_->weight(rmsnorm_pos);
   rms_final_layer->set_weight(0, {config_->dim_}, weight_rmsnorm_final, cpu_device_type);
   llama_layers_->rmsnorm_layers_.push_back(rms_final_layer);
 }
@@ -323,7 +439,6 @@ void LLama2Model::init_mem() {
       base::CPUDeviceAllocatorFactory::get_instance();
   std::shared_ptr<base::DeviceAllocator> alloc_cu =
       base::CUDADeviceAllocatorFactory::get_instance();
-  int32_t max_seq_len = config_->seq_len_;
   // 减少开销
   tensor::Tensor input_tokens(base::DataType::kDataTypeInt32, 1, true, alloc_cpu);
   tensor::Tensor input_embeddings(base::DataType::kDataTypeFp32, 1, config_->dim_, true, alloc);
@@ -406,7 +521,11 @@ base::Status LLama2Model::create_layers() {
     llama_layers_ = std::make_unique<LLama2Layers>();
   }
 
-  create_param_layers();
+  if (!is_quant_model_) {
+    create_param_layers();
+  } else {
+    create_param_quant_layers();
+  }
   create_nonparam_layers();
 
   if (!llama_layers_->embedding_layer_) {

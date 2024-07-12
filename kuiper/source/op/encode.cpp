@@ -2,8 +2,7 @@
 #include <glog/logging.h>
 namespace op {
 EncodeLayer::EncodeLayer(base::DeviceType device_type)
-    : Layer(device_type, LayerType::kLayerEncode, "Encode") {
-}
+    : Layer(device_type, LayerType::kLayerEncode,  "Encode") {}
 
 EncodeLayer::EncodeLayer(
     base::DeviceType device_type, bool has_bos, bool has_eos,
@@ -11,8 +10,7 @@ EncodeLayer::EncodeLayer(
     : Layer(device_type, LayerType::kLayerEncode, "Encode"),
       has_bos_(has_bos),
       has_eos_(has_eos),
-      spe(std::move(sentence_piece_processor)) {
-}
+      spe(std::move(sentence_piece_processor)) {}
 
 int32_t EncodeLayer::eos() const {
   CHECK(this->spe);

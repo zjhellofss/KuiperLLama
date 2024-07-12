@@ -72,7 +72,7 @@ class BaseLayer {
   virtual base::Status set_weight(int32_t idx, const tensor::Tensor& weight);
 
   virtual base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims,
-                                  const float* weight_ptr,
+                                  const void* weight_ptr,
                                   base::DeviceType device_type = base::DeviceType::kDeviceUnknown);
 
   const std::string& get_layer_name() const;
@@ -154,10 +154,10 @@ class Layer : public BaseLayer {
   std::shared_ptr<kernel::CudaConfig> cuda_config_;
 };
 
-class LayerFp32Param : public Layer {
+class LayerParam : public Layer {
  public:
-  explicit LayerFp32Param(base::DeviceType device_type, LayerType layer_type,
-                          std::string layer_name = "");
+  explicit LayerParam(base::DeviceType device_type, LayerType layer_type,
+                      bool is_quant_layer = false, std::string layer_name = "");
 
   size_t weight_size() const;
 
@@ -171,10 +171,19 @@ class LayerFp32Param : public Layer {
 
   base::Status set_weight(int32_t idx, const tensor::Tensor& weight) override;
 
-  base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims, const float* weight_ptr,
+  base::Status set_weight(int32_t idx, const std::vector<int32_t>& dims, const void* weight_ptr,
                           base::DeviceType device_type = base::DeviceType::kDeviceUnknown) override;
 
- private:
+  void set_scales(const tensor::Tensor& scales);
+
+  void set_group_size(int32_t group_size);
+
+  int32_t get_scale_num() const;
+
+ protected:
+  int32_t group_size_ = 0;
+  bool is_quant_layer_ = false;
+  tensor::Tensor scales_;
   std::vector<tensor::Tensor> weights_;
 };
 }  // namespace op

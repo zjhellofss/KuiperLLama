@@ -2,52 +2,22 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 namespace model {
-RawModelData::~RawModelData() {
-  if (data != nullptr && data != MAP_FAILED) {
-    munmap(data, file_size);
-    data = nullptr;
-  }
-  if (fd != -1) {
-    close(fd);
-    fd = -1;
-  }
-}
-
-const float* RawModelData::weight(size_t offset) const {
-  return weight_data + offset;
-}
-
-bool RawModelData::is_weight_valid(size_t peek) const {
-  if (peek * sizeof(float) < file_size) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-Model::Model(base::ModelType model_type, std::string token_path, std::string model_path)
+Model::Model(base::ModelType model_type, std::string token_path, std::string model_path,
+             bool is_quant_model)
     : model_type_(model_type),
       token_path_(std::move(token_path)),
-      model_path_(std::move(model_path)) {
-}
+      model_path_(std::move(model_path)),
+      is_quant_model_(is_quant_model) {}
 
-base::ModelType Model::model_type() const {
-  return model_type_;
-}
+base::ModelType Model::model_type() const { return model_type_; }
 
-const std::string& Model::token_path() const {
-  return token_path_;
-}
+const std::string& Model::token_path() const { return token_path_; }
 
-const std::string& Model::model_path() const {
-  return model_path_;
-}
+const std::string& Model::model_path() const { return model_path_; }
 
-base::Status Model::insert_buffer(ModelBufferType buffer_idx,
-                                  const tensor::Tensor& tensor) {
+base::Status Model::insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor) {
   if (buffers_.count(buffer_idx) > 0) {
-    return base::error::KeyHasExits(std::to_string(int(buffer_idx)) +
-                                    " has exits in the buffers");
+    return base::error::KeyHasExits(std::to_string(int(buffer_idx)) + " has exits in the buffers");
   }
   if (tensor.is_empty()) {
     return base::error::InvalidArgument("The tensor is empty for inserting buffer.");
@@ -69,8 +39,7 @@ const tensor::Tensor& Model::get_buffer(ModelBufferType buffer_idx) const {
 base::Status Model::read_model_file() {
   using namespace base;
   if (model_path_.empty()) {
-    return error::PathNotValid(
-        "Failed to open the weight file, the model path is empty!");
+    return error::PathNotValid("Failed to open the weight file, the model path is empty!");
   }
   int32_t fd = open(model_path_.data(), O_RDONLY);
   if (fd == -1) {
@@ -89,34 +58,46 @@ base::Status Model::read_model_file() {
         "Failed to retrieve the configuration information from the model "
         "file.");
   }
+  if (is_quant_model_) {
+    if (fread(&group_size_, sizeof(int32_t), 1, file) != 1) {
+      return error::ModelParseError(
+          "Failed to retrieve the group size information from the model "
+          "file.");
+    }
+  }
 
   auto gen_status = generate_model_infos(config);
   if (!gen_status) {
     return gen_status;
   }
 
-  raw_model_data_ = std::make_shared<RawModelData>();
+  if (!is_quant_model_) {
+    raw_model_data_ = std::make_shared<RawModelDataFp32>();
+  } else {
+    raw_model_data_ = std::make_shared<RawModelDataInt8>();
+  }
   fseek(file, 0, SEEK_END);
   raw_model_data_->file_size = ftell(file);
   fclose(file);
 
   raw_model_data_->fd = fd;
   raw_model_data_->data =
-      static_cast<float*>(mmap(nullptr, raw_model_data_->file_size, PROT_READ,
-                               MAP_PRIVATE, raw_model_data_->fd, 0));
+      mmap(nullptr, raw_model_data_->file_size, PROT_READ, MAP_PRIVATE, raw_model_data_->fd, 0);
 
   if (raw_model_data_->data == MAP_FAILED || raw_model_data_->data == nullptr) {
-    return error::ModelParseError("Failed to map the weight file " + model_path_ +
-                                  " into memory.");
+    return error::ModelParseError("Failed to map the weight file " + model_path_ + " into memory.");
   }
-
-  raw_model_data_->weight_data =
-      raw_model_data_->data + sizeof(ModelConfig) / sizeof(float);
+  if (!is_quant_model_) {
+    raw_model_data_->weight_data =
+        static_cast<int8_t*>(raw_model_data_->data) + sizeof(ModelConfig);
+  } else {
+    raw_model_data_->weight_data =
+        static_cast<int8_t*>(raw_model_data_->data) + sizeof(ModelConfig) + sizeof(group_size_);
+  }
   if (raw_model_data_ == nullptr) {
     LOG(ERROR);
-    return error::ModelParseError(
-        "Failed to map the weight file " + model_path_ +
-        " into memory, the pointer to weight start address is null");
+    return error::ModelParseError("Failed to map the weight file " + model_path_ +
+                                  " into memory, the pointer to weight start address is null");
   }
   return error::Success();
 }
@@ -161,8 +142,7 @@ base::Status Model::create_encode_layer() {
   }
 
   // create token encode decode layer
-  encode_layer_ =
-      std::make_unique<op::EncodeLayer>(device_type_, true, false, std::move(spe));
+  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false, std::move(spe));
   if (!encode_layer_) {
     return error::InternalError("Create the encode layer failed.");
   }

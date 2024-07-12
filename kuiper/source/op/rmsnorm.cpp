@@ -5,7 +5,7 @@
 #include "kernels/kernels_interface.h"
 namespace op {
 RmsNormLayer::RmsNormLayer(base::DeviceType device_type, int32_t dim)
-    : LayerFp32Param(device_type, LayerType::kLayerRMSNorm, "RMSNorm"), dim_(dim) {
+    : LayerParam(device_type, LayerType::kLayerRMSNorm, false, "RMSNorm"), dim_(dim) {
   reset_input_size(1);
   reset_output_size(1);
   reset_weight_size(1);
