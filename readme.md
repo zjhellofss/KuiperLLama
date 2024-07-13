@@ -75,6 +75,7 @@
 2. google gtest https://github.com/google/googletest
 3. sentencepiece https://github.com/google/sentencepiece
 4. armadillo + openblas https://arma.sourceforge.net/download.html
+5. Cuda Toolkit
 
 **openblas作为armadillo的后端数学库，加速矩阵乘法等操作，也可以选用Intel-MKL，这个库用于CPU上的推理计算**
 
@@ -89,7 +90,8 @@
 ## 模型导出
 ```shell
 python export.py llama2_7b.bin --meta-llama path/to/llama/model/7B
-# 也可以使用--hf标签从hugging face中加载模型
+# 使用--hf标签从hugging face中加载模型， 指定--version3可以导出量化模型
+# 其他使用方法请看export.py中的命令行参数实例
 ```
 
 
