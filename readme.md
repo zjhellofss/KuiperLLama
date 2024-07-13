@@ -81,11 +81,13 @@
 
 
 ## 模型下载地址
-1. llama2 https://pan.baidu.com/s/1PF5KqvIvNFR8yDIY1HmTYA?pwd=ma8r 或 https://huggingface.co/fushenshen/lession_model/tree/main
+1. LLama2 https://pan.baidu.com/s/1PF5KqvIvNFR8yDIY1HmTYA?pwd=ma8r 或 https://huggingface.co/fushenshen/lession_model/tree/main
 
 2. Tiny LLama 
-* tinyllama模型 https://huggingface.co/karpathy/tinyllamas/tree/main
-* tinyllama分词器 https://huggingface.co/yahma/llama-7b-hf/blob/main/tokenizer.model
+* TinyLLama模型 https://huggingface.co/karpathy/tinyllamas/tree/main
+* TinyLLama分词器 https://huggingface.co/yahma/llama-7b-hf/blob/main/tokenizer.model
+
+**需要其他LLama结构的模型请看下一节模型导出**
 
 ## 模型导出
 ```shell
