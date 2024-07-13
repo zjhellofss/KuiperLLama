@@ -5,7 +5,10 @@
 
 <img src="./imgs/me.jpg" alt="me" height="480px" width="400px" />
 
+## 项目运行效果
+> LLama 1.1b fp32
 
+![](./imgs/do.gif)
 
 ## 课程目录
 只要178块，只要178块，只要178块！重要的事情说三遍！！！
