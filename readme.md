@@ -6,8 +6,7 @@
 <img src="./imgs/me.jpg" alt="me" height="480px" width="400px" />
 
 ## 项目运行效果
-> LLama1.1b fp32模型，视频无加速，运行平台为Nvidia 3060 laptop
-
+> LLama1.1b fp32模型，视频无加速，运行平台为Nvidia 3060 laptop，速度为60.34 token/s
 ![](./imgs/do.gif)
 
 ## 课程目录
