@@ -19,9 +19,9 @@ class Model {
   virtual base::Status init(base::DeviceType device_type) = 0;
 
   virtual base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
-                               bool is_prompt, int& next) = 0;
+                               bool is_prompt, int& next) const = 0;
 
-  virtual int32_t get_eos() = 0;
+  virtual int32_t get_eos() const = 0;
 
   base::ModelType model_type() const;
 

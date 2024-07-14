@@ -1,19 +1,8 @@
 #include <base/tick.h>
 #include <glog/logging.h>
 #include "model/llama2.h"
-int main(int argc, char* argv[]) {
-  if (argc != 3) {
-    LOG(INFO) << "Usage: ./demo checkpoint_path tokenizer_path ";
-    return -1;
-  }
-  const char* checkpoint_path = argv[1];  // e.g. out/model.bin
-  const char* tokenizer_path = argv[2];
-  model::LLama2Model model(tokenizer_path, checkpoint_path,false);
-  auto init_status = model.init(base::DeviceType::kDeviceCUDA);
-  if (!init_status) {
-    LOG(FATAL) << "The model init failed, the error code is: " << init_status.get_err_code();
-  }
-  std::string sentence = "This";  // prompts
+int32_t generate(const model::LLama2Model& model, const std::string& sentence, int total_steps,
+                 bool need_output = false) {
   auto tokens = model.encode(sentence);
   int32_t prompt_len = tokens.size();
   LOG_IF(FATAL, tokens.empty()) << "The tokens is empty.";
@@ -21,11 +10,9 @@ int main(int argc, char* argv[]) {
   int32_t pos = 0;
   int32_t next = -1;
   bool is_prompt = true;
-  int32_t total_steps = 128;
   const auto& prompt_embedding = model.embedding(tokens);
   tensor::Tensor pos_tensor = model.get_buffer(model::ModelBufferType::kInputPos);
 
-  TICK(A)
   while (pos < total_steps) {
     pos_tensor.index<int32_t>(0) = pos;
     if (pos < prompt_len - 1) {
@@ -48,11 +35,37 @@ int main(int argc, char* argv[]) {
     } else {
       word = model.decode(next);
     }
-    printf("%s ", word.c_str());
-    fflush(stdout);
+
+    if (need_output) {
+      printf("%s ", word.c_str());
+      fflush(stdout);
+    }
     pos += 1;
   }
-  printf("\n");
-  TOCK(A)
+  return std::min(pos, total_steps);
+}
+
+int main(int argc, char* argv[]) {
+  if (argc != 3) {
+    LOG(INFO) << "Usage: ./demo checkpoint_path tokenizer_path ";
+    return -1;
+  }
+  const char* checkpoint_path = argv[1];  // e.g. out/model.bin
+  const char* tokenizer_path = argv[2];
+  model::LLama2Model model(tokenizer_path, checkpoint_path, false);
+  auto init_status = model.init(base::DeviceType::kDeviceCUDA);
+  if (!init_status) {
+    LOG(FATAL) << "The model init failed, the error code is: " << init_status.get_err_code();
+  }
+  const std::string& sentence = "This";
+  generate(model, sentence, 128, true);
+  generate(model, sentence, 128, true);
+
+  auto start = std::chrono::steady_clock::now();
+  int steps = generate(model, sentence, 128);
+  auto end = std::chrono::steady_clock::now();
+  auto duration = std::chrono::duration<double>(end - start).count();
+  printf("\nsteps/s:%lf\n", static_cast<double>(steps) / duration);
+  fflush(stdout);
   return 0;
 }

@@ -132,7 +132,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
 }
 
 base::Status LLama2Model::forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
-                                  bool is_prompt, int& next) {
+                                  bool is_prompt, int& next) const {
   if (input.is_empty()) {
     return base::error::InvalidArgument("The input tensor is empty.");
   }
@@ -412,7 +412,7 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) const {
   return encode_layer_->encode(sentence);
 }
 
-int32_t LLama2Model::get_eos() {
+int32_t LLama2Model::get_eos() const {
   CHECK(this->encode_layer_ != nullptr);
   return this->encode_layer_->eos();
 }

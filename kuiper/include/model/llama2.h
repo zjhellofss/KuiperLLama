@@ -37,11 +37,11 @@ class LLama2Model : public Model {
   base::Status init(base::DeviceType device_type) override;
 
   base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
-                       bool is_prompt, int& next) override;
+                       bool is_prompt, int& next) const override;
 
   std::vector<int32_t> encode(const std::string& sentence) const override;
 
-  int32_t get_eos() override;
+  int32_t get_eos() const override;
 
   std::string decode(int32_t token_idx) const override;
 
