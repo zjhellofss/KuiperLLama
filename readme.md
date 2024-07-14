@@ -3,7 +3,7 @@
 
 **🙋🙋🙋 自制大模型推理框架火热进行中，只要178块，请加下方微信了解**
 
-<img src="./imgs/me.jpg" alt="me" height="480px" width="400px" />
+<img src="./imgs/me.jpg" alt="me" height="360px" width="300px" />
 
 ## 项目运行效果
 > LLama1.1b fp32模型，视频无加速，运行平台为Nvidia 3060 laptop，速度为60.34 token/s
