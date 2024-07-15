@@ -5,7 +5,12 @@
 namespace sampler {
 class Sampler {
  public:
-  virtual int32_t sample(const float* logits, int32_t size) = 0;
+  explicit Sampler(base::DeviceType device_type) : device_type_(device_type) {}
+
+  virtual size_t sample(const float* logits, size_t size, void* stream = nullptr) = 0;
+
+ protected:
+  base::DeviceType device_type_;
 };
 }  // namespace sampler
 #endif  // LLAMA_INFER_SAMPLER_H

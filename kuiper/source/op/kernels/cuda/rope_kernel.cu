@@ -31,7 +31,7 @@ __global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
 void rope_kernel_cu(int32_t dim, int32_t kv_dim, int32_t head_size, const tensor::Tensor& input_q,
                     const tensor::Tensor& input_k, const tensor::Tensor& input_pos, void* stream) {
   const int32_t pos = *input_pos.ptr<int32_t>(0);
-  int threads = 512;
+  int threads = 128;
   int blocks = (dim + threads - 1) / threads;
   if (stream) {
     cudaStream_t stream_ = static_cast<cudaStream_t>(stream);

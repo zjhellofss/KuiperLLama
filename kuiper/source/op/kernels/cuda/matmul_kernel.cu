@@ -1,4 +1,5 @@
 #include <tensor/tensor.h>
+#include <cub/block/block_reduce.cuh>
 #include "../kernels_interface.h"
 #include "matmul_kernel.cuh"
 namespace kernel {
@@ -13,21 +14,40 @@ __global__ void matmul_kernel_cu_fp32(const float* input, const float* weight, f
   if (start_row >= K) {
     return;
   }
+#pragma unroll
   for (int p = start_row; p < end_row; ++p) {
     sdata[tid] = 0;
-    for (int i = tid; i < M; i += THREAD_PER_BLOCK) {
-      sdata[tid] += input[i] * weight[p * M + i];
+#pragma unroll
+    for (int i = tid * 4; i < M; i += THREAD_PER_BLOCK * 4) {
+      float part_sum = 0.f;
+      float4 input_float4 = *(float4*)(input + i);
+      float4 weight_float4 = *(float4*)(weight + p * M + i);
+      if (i < M) {
+        part_sum += weight_float4.x * input_float4.x;
+      }
+
+      if (i + 1 < M) {
+        part_sum += weight_float4.y * input_float4.y;
+      }
+
+      if (i + 2 < M) {
+        part_sum += weight_float4.z * input_float4.z;
+      }
+
+      if (i + 3 < M) {
+        part_sum += weight_float4.w * input_float4.w;
+      }
+      sdata[tid] += part_sum;
     }
     __syncthreads();
-    for (unsigned int s = 1; s < THREAD_PER_BLOCK; s *= 2) {
-      if ((tid & (2 * s - 1)) == 0) {
-        sdata[tid] += sdata[tid + s];
-      }
-      __syncthreads();
-    }
+
+    using BlockReduce = cub::BlockReduce<float, THREAD_PER_BLOCK>;
+    __shared__ typename BlockReduce::TempStorage temp;
+    float part_sum = BlockReduce(temp).Sum(sdata[tid]);
+    __syncthreads();
 
     if (tid == 0) {
-      output[p] = sdata[0];
+      output[p] = part_sum;
     }
     __syncthreads();
   }
@@ -53,15 +73,14 @@ __global__ void matmul_kernel_cu_fp32int8(const float* input, const int8_t* weig
       sdata[tid] += input[i] * scales[group_idx] * static_cast<float>(weight[weight_idx]);
     }
     __syncthreads();
-    for (unsigned int s = 1; s < THREAD_PER_BLOCK; s *= 2) {
-      if ((tid & (2 * s - 1)) == 0) {
-        sdata[tid] += sdata[tid + s];
-      }
-      __syncthreads();
-    }
+
+    using BlockReduce = cub::BlockReduce<float, THREAD_PER_BLOCK>;
+    __shared__ typename BlockReduce::TempStorage temp;
+    float part_sum = BlockReduce(temp).Sum(sdata[tid]);
+    __syncthreads();
 
     if (tid == 0) {
-      output[p] = sdata[0];
+      output[p] = part_sum;
     }
     __syncthreads();
   }
@@ -80,7 +99,7 @@ void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
   const int32_t K = weight.get_dim(0);  // row
   const int32_t M = weight.get_dim(1);  // col
   CHECK_EQ(M, input.get_dim(0));
-  matmul_kernel_cu_fp32<256, 1><<<K, 256>>>(input.ptr<float>(), weight.ptr<float>(),
+  matmul_kernel_cu_fp32<128, 1><<<K, 128>>>(input.ptr<float>(), weight.ptr<float>(),
                                             const_cast<float*>(output.ptr<float>()), M, K);
 }
 
@@ -98,7 +117,7 @@ void matmul_kernel_cu_qint8(const tensor::Tensor& input, const tensor::Tensor& w
   const int32_t K = weight.get_dim(0);  // row
   const int32_t M = weight.get_dim(1);  // col
   CHECK_EQ(M, input.get_dim(0));
-  matmul_kernel_cu_fp32int8<256, 1><<<K, 256>>>(input.ptr<float>(), weight.ptr<int8_t>(),
+  matmul_kernel_cu_fp32int8<128, 1><<<K, 128>>>(input.ptr<float>(), weight.ptr<int8_t>(),
                                                 scale.ptr<float>(), group_size,
                                                 const_cast<float*>(output.ptr<float>()), M, K);
 }

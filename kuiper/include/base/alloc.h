@@ -1,5 +1,6 @@
 #ifndef KUIPER_INCLUDE_BASE_ALLOC_H_
 #define KUIPER_INCLUDE_BASE_ALLOC_H_
+#include <map>
 #include <memory>
 #include "base.h"
 namespace base {
@@ -12,23 +13,19 @@ enum class MemcpyKind {
 
 class DeviceAllocator {
  public:
-  explicit DeviceAllocator(DeviceType device_type) : device_type_(device_type) {
-  }
+  explicit DeviceAllocator(DeviceType device_type) : device_type_(device_type) {}
 
-  virtual DeviceType device_type() const {
-    return device_type_;
-  }
+  virtual DeviceType device_type() const { return device_type_; }
 
   virtual void release(void* ptr) const = 0;
 
   virtual void* allocate(size_t byte_size) const = 0;
 
   virtual void memcpy(const void* src_ptr, void* dest_ptr, size_t byte_size,
-                      MemcpyKind memcpy_kind = MemcpyKind::kMemcpyCPU2CPU,
-                      void* stream = nullptr, bool need_sync = false) const;
+                      MemcpyKind memcpy_kind = MemcpyKind::kMemcpyCPU2CPU, void* stream = nullptr,
+                      bool need_sync = false) const;
 
-  virtual void memset_zero(void* ptr, size_t byte_size, void* stream,
-                           bool need_sync = false);
+  virtual void memset_zero(void* ptr, size_t byte_size, void* stream, bool need_sync = false);
 
  private:
   DeviceType device_type_ = DeviceType::kDeviceUnknown;
@@ -43,6 +40,17 @@ class CPUDeviceAllocator : public DeviceAllocator {
   void release(void* ptr) const override;
 };
 
+struct CudaMemoryBuffer {
+  void* data;
+  size_t byte_size;
+  bool busy;
+
+  CudaMemoryBuffer() = default;
+
+  CudaMemoryBuffer(void* data, size_t byte_size, bool busy)
+      : data(data), byte_size(byte_size), busy(busy) {}
+};
+
 class CUDADeviceAllocator : public DeviceAllocator {
  public:
   explicit CUDADeviceAllocator();
@@ -50,6 +58,11 @@ class CUDADeviceAllocator : public DeviceAllocator {
   void* allocate(size_t byte_size) const override;
 
   void release(void* ptr) const override;
+
+ private:
+  mutable std::map<int, size_t> no_busy_cnt_;
+  mutable std::map<int, std::vector<CudaMemoryBuffer>> big_buffers_map_;
+  mutable std::map<int, std::vector<CudaMemoryBuffer>> cuda_buffers_map_;
 };
 
 class CPUDeviceAllocatorFactory {

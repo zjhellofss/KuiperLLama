@@ -7,7 +7,6 @@
 #include <sentencepiece_processor.h>
 #include <utility>
 #include "base/tick.h"
-#include "sampler/mult_sampler.h"
 namespace model {
 
 void LLama2Layers::to_cuda(std::shared_ptr<kernel::CudaConfig> config) {
@@ -127,7 +126,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
     return read_status;
   }
   init_mem();
-  sampler_ = std::make_unique<sampler::ArgmaxSampler>();
+  sampler_ = std::make_unique<sampler::ArgmaxSampler>(device_type_);
   return error::Success();
 }
 
@@ -759,18 +758,13 @@ void LLama2Model::cls_logits(const tensor::Tensor& input) const {
 int32_t LLama2Model::post_processing(const tensor::Tensor& pos, bool is_prompt) const {
   tensor::Tensor forward_output = get_buffer(ModelBufferType::kForwardOutput);
   const float* forward_logits = forward_output.ptr<float>();
-  if (device_type_ == base::DeviceType::kDeviceCUDA) {
-    const float* forward_logits_cpu = get_buffer(ModelBufferType::kForwardOutputCPU).ptr<float>();
-    cudaMemcpy(const_cast<float*>(forward_logits_cpu), forward_logits, forward_output.byte_size(),
-               cudaMemcpyDeviceToHost);
-    forward_logits = forward_logits_cpu;
-  }
 
   int32_t next = 0;
   if (is_prompt) {
     next = -1;
   } else {
-    next = sampler_->sample(forward_logits, static_cast<int32_t>(forward_output.size()));
+    next = static_cast<int32_t>(sampler_->sample(forward_logits, forward_output.size(),
+                                                 cuda_config_ ? cuda_config_->stream : nullptr));
   }
   return next;
 }
