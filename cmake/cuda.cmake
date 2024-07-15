@@ -64,22 +64,18 @@ if (CUDA_FOUND)
 
     set(CUDA_ARCH_BIN ${__CUDA_ARCH_BIN} CACHE STRING "Specify 'real' GPU architectures to build binaries for")
 
-    #    if (POLICY CMP0104)
-    #        cmake_policy(SET CMP0104 NEW)
-    #        set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_BIN})
-    #        message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
-    #    else ()
-    #        # Generate SASS
-    #        set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_BIN})
-    #        # Generate PTX for last architecture
-    #        list(GET CUDA_ARCH_BIN -1 ver)
-    #        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_${ver},code=compute_${ver}")
-    #        message(STATUS "CMAKE_CUDA_FLAGS: ${CMAKE_CUDA_FLAGS}")
-    #    endif ()
-
-    set(CMAKE_CUDA_ARCHITECTURES 86)
-    message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
-
+    if (POLICY CMP0104)
+        cmake_policy(SET CMP0104 NEW)
+        set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_BIN})
+        message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
+    else ()
+        # Generate SASS
+        set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_BIN})
+        # Generate PTX for last architecture
+        list(GET CUDA_ARCH_BIN -1 ver)
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_${ver},code=compute_${ver}")
+        message(STATUS "CMAKE_CUDA_FLAGS: ${CMAKE_CUDA_FLAGS}")
+    endif ()
 
     if (DEFINED CMAKE_CUDA_COMPILER_LIBRARY_ROOT_FROM_NVVMIR_LIBRARY_DIR)
         set(CMAKE_CUDA_COMPILER_LIBRARY_ROOT "${CMAKE_CUDA_COMPILER_LIBRARY_ROOT_FROM_NVVMIR_LIBRARY_DIR}")
