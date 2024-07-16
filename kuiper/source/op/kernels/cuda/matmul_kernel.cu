@@ -17,11 +17,12 @@ __global__ void matmul_kernel_cu_fp32(const float* input, const float* weight, f
 #pragma unroll
   for (int p = start_row; p < end_row; ++p) {
     sdata[tid] = 0;
+    int row_offset = p * M;
 #pragma unroll
     for (int i = tid * 4; i < M; i += THREAD_PER_BLOCK * 4) {
       float part_sum = 0.f;
       float4 input_float4 = *(float4*)(input + i);
-      float4 weight_float4 = *(float4*)(weight + p * M + i);
+      float4 weight_float4 = *(float4*)(weight + row_offset + i);
       if (i < M) {
         part_sum += weight_float4.x * input_float4.x;
       }
