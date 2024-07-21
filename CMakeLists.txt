@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.16)
-set(CMAKE_CUDA_COMPILER /usr/local/cuda-11.8/bin/nvcc)
 project(llama_infer CXX CUDA)
 include(cmake/cuda.cmake)
 
