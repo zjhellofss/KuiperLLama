@@ -21,10 +21,9 @@ __global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
   float val = static_cast<float>(pos) * freq;
   float fcr = cosf(val);
   float fci = sinf(val);
-  rope_calc(fcr, fci, const_cast<float*>(input_q), idx);
-  if (idx >= kv_dim) {
-    return;
-  }
+  bool is_greater = idx >= kv_dim;
+
+  return rope_calc(fcr, fci, const_cast<float*>(input_q), idx) ;
   rope_calc(fcr, fci, const_cast<float*>(input_k), idx);
 }
 
