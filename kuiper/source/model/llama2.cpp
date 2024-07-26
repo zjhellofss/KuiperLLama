@@ -131,7 +131,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
 }
 
 base::Status LLama2Model::forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
-                                  bool is_prompt, int& next) const {
+                                  int& next) const  {
   if (input.is_empty()) {
     return base::error::InvalidArgument("The input tensor is empty.");
   }
@@ -149,7 +149,6 @@ base::Status LLama2Model::forward(const tensor::Tensor& input, const tensor::Ten
     feed_forward(layer_idx, input);
   }
   cls_logits(input);
-  next = post_processing(pos_tensor, is_prompt);
   return base::error::Success();
 }
 
@@ -672,6 +671,16 @@ void LLama2Model::attention_qkv(int32_t layer_idx, const tensor::Tensor& pos_ten
   CHECK_NE(llama_layers_->rope_layer_, nullptr)
       << "The RoPE layer in the attention block is null pointer.";
   STATUS_CHECK(llama_layers_->rope_layer_->forward(query, key, pos_tensor, tensor::Tensor{}));
+}
+
+base::Status LLama2Model::predict(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
+                                  bool is_prompt, int& next) const {
+  auto status = forward(input, pos_tensor, next);
+  if (!status) {
+    return status;
+  }
+  next = post_processing(pos_tensor, is_prompt);
+  return base::error::Success();
 }
 
 void LLama2Model::attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) const {

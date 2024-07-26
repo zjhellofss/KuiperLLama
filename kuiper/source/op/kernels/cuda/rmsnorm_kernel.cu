@@ -64,22 +64,12 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
   float* in_ptr = const_cast<float*>(input.ptr<float>());
   float* wei_ptr = const_cast<float*>(weight.ptr<float>());
   float* out_ptr = const_cast<float*>(output.ptr<float>());
-  if (size < 1024) {
-    constexpr int threads_num = 128;
-    if (stream) {
-      cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
-      row_rmsnorm_f32<128><<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size, eps);
-    } else {
-      row_rmsnorm_f32<128><<<1, threads_num>>>(in_ptr, wei_ptr, out_ptr, size, eps);
-    }
+  constexpr int threads_num = 128;
+  if (stream) {
+    cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
+    row_rmsnorm_f32<128><<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size, eps);
   } else {
-    constexpr int threads_num = 1024;
-    if (stream) {
-      cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
-      row_rmsnorm_f32<1024><<<1, threads_num, 0, stream_>>>(in_ptr, wei_ptr, out_ptr, size, eps);
-    } else {
-      row_rmsnorm_f32<1024><<<1, threads_num>>>(in_ptr, wei_ptr, out_ptr, size, eps);
-    }
+    row_rmsnorm_f32<128><<<1, threads_num>>>(in_ptr, wei_ptr, out_ptr, size, eps);
   }
 }
 }  // namespace kernel

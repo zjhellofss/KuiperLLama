@@ -36,8 +36,11 @@ class LLama2Model : public Model {
 
   base::Status init(base::DeviceType device_type) override;
 
-  base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
+  base::Status predict(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
                        bool is_prompt, int& next) const override;
+
+  base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
+                       int& next) const override;
 
   std::vector<int32_t> encode(const std::string& sentence) const override;
 

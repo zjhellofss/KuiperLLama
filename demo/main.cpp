@@ -17,13 +17,13 @@ int32_t generate(const model::LLama2Model& model, const std::string& sentence, i
     pos_tensor.index<int32_t>(0) = pos;
     if (pos < prompt_len - 1) {
       tensor::Tensor input = model.fill_input(pos_tensor, prompt_embedding, is_prompt);
-      next = model.forward(input, pos_tensor, is_prompt, next);
+       model.predict(input, pos_tensor, is_prompt, next);
     } else {
       is_prompt = false;
       tokens = std::vector<int32_t>{next};
       const auto& token_embedding = model.embedding(tokens);
       tensor::Tensor input = model.fill_input(pos_tensor, token_embedding, is_prompt);
-      model.forward(input, pos_tensor, is_prompt, next);
+      model.predict(input, pos_tensor, is_prompt, next);
     }
     if (next == model.get_eos()) {
       break;
