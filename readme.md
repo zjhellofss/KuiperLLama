@@ -5,7 +5,7 @@
 
 
 
-<img src="./imgs/me.jpg" alt="me" height="360px" width="300px" />
+<img src="./imgs/me.jpg"  />
 
 
 
