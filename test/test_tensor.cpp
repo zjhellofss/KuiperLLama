@@ -41,7 +41,6 @@ TEST(test_tensor, init4) {
   ASSERT_EQ(t1.is_empty(), false);
   ASSERT_EQ(t1.ptr<float>(), ptr);
   ASSERT_EQ(*t1.ptr<float>(), 31);
-  delete[] ptr;
 }
 
 TEST(test_tensor, index) {
