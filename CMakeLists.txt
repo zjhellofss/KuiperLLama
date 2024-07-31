@@ -47,11 +47,11 @@ if(USE_CPM)
   )
 endif()
 
+find_package(sentencepiece REQUIRED)
 # ---------------------------------
 find_package(GTest REQUIRED)
 find_package(glog REQUIRED)
 find_package(Armadillo REQUIRED)
-find_package(sentencepiece REQUIRED)
 aux_source_directory(kuiper/source/tensor/ DIR_TENSOR)
 aux_source_directory(kuiper/source/base/ DIR_BASE)
 aux_source_directory(kuiper/source/op/ DIR_OP)
