@@ -45,9 +45,9 @@ if(USE_CPM)
     GITHUB_REPOSITORY google/sentencepiece
     VERSION 0.2.0
   )
+  find_package(sentencepiece REQUIRED)
 endif()
 
-find_package(sentencepiece REQUIRED)
 # ---------------------------------
 find_package(GTest REQUIRED)
 find_package(glog REQUIRED)
@@ -71,7 +71,12 @@ target_include_directories(llama PUBLIC ${glog_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${PROJECT_SOURCE_DIR}/kuiper/include)
 target_include_directories(llama PUBLIC ${Armadillo_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-target_include_directories(llama PUBLIC ${sentencepiece_SOURCE_DIR}/src) # Add sentencepiece include directory
+
+if(USE_CPM)
+  # Add sentencepiece include directory
+  target_include_directories(llama PUBLIC ${sentencepiece_SOURCE_DIR}/src)
+endif()
+
 set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 add_subdirectory(test)
 add_subdirectory(demo)
