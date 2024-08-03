@@ -102,10 +102,12 @@ python export.py llama2_7b.bin --meta-llama path/to/llama/model/7B
 
 ## 编译方法
 ```shell
-  # 假设已经装好上述的第三方依赖
   mkdir build 
   cd build
+  # 需要安装上述的第三方依赖
   cmake ..
+  # 或者开启 USE_CPM 选项，自动下载第三方依赖
+  cmake -DUSE_CPM=ON ..
   make -j16
 ```
 

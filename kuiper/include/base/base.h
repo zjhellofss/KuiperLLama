@@ -26,6 +26,9 @@ enum class ModelBufferType {
   kFFNRMSNorm = 13,
   kForwardOutput = 15,
   kForwardOutputCPU = 16,
+
+  kSinCache = 17,
+  kCosCache = 18,
 };
 }
 
