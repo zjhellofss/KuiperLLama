@@ -189,7 +189,7 @@ base::Status LayerParam::set_weight(int32_t idx, const std::vector<int32_t>& dim
 
   size_t size = std::accumulate(dims.begin(), dims.end(), sizeof(float), std::multiplies<>());
   std::shared_ptr<base::Buffer> buffer =
-      std::make_shared<base::Buffer>(size, nullptr, (void*)(weight_ptr), true);
+      std::make_shared<base::Buffer>(size, nullptr, const_cast<void*>(weight_ptr), true);
   if (device_type != base::DeviceType::kDeviceUnknown) {
     buffer->set_device_type(device_type);
   }
