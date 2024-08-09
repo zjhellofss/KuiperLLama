@@ -91,5 +91,19 @@ class CUDADeviceAllocatorFactory {
   static std::shared_ptr<CUDADeviceAllocator> instance;
 };
 
+class DeviceAlloctorFactory {
+ public:
+  static std::shared_ptr<DeviceAllocator> get_instance(base::DeviceType device_type) {
+    if (device_type == base::DeviceType::kDeviceCPU) {
+      return CPUDeviceAllocatorFactory::get_instance();
+    } else if (device_type == base::DeviceType::kDeviceCUDA) {
+      return CPUDeviceAllocatorFactory::get_instance();
+    } else {
+      LOG(FATAL) << "This device type of allocator is not supported!";
+      return nullptr;
+    }
+  }
+};
+
 }  // namespace base
 #endif  // KUIPER_INCLUDE_BASE_ALLOC_H_

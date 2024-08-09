@@ -626,10 +626,7 @@ op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const
       << "The embedding layer in the llama2 model is null pointer.";
   STATUS_CHECK(
       llama_layers_->embedding_layer_->forward(input_tokens, input_token_num, input_embeddings));
-  op::EmbeddingOutput output;
-  output.input_embeddings = input_embeddings;
-  output.input_tokens = input_tokens;
-  output.input_token_num = input_token_num;
+  op::EmbeddingOutput output(input_tokens, input_embeddings, input_token_num);
   return output;
 }
 
