@@ -88,7 +88,6 @@ __global__ void matmul_kernel_cu_fp32int8(const float* input, const int8_t* weig
 
 void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
                       const tensor::Tensor& output, const float scale, const CudaConfig* config) {
-  CHECK(config != nullptr);
   CHECK(input.is_empty() == false && input.dims_size() <= 2);
   CHECK(input.device_type() == base::DeviceType::kDeviceCUDA);
 
@@ -100,7 +99,7 @@ void matmul_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight,
   CHECK_EQ(M % packet_size, 0);
 
   CHECK_EQ(M, input.get_dim(0));
-  if (config->stream) {
+  if (config && config->stream) {
     matmul_kernel_cu_fp32<128, 1><<<K, 128, 0, config->stream>>>(
         input.ptr<float>(), weight.ptr<float>(), const_cast<float*>(output.ptr<float>()), M, K);
   } else {
@@ -127,11 +126,10 @@ void matmul_kernel_cu_qint8(const tensor::Tensor& input, const tensor::Tensor& w
     matmul_kernel_cu_fp32int8<128, 1><<<K, 128, 0, config->stream>>>(
         input.ptr<float>(), weight.ptr<int8_t>(), scale.ptr<float>(), group_size,
         const_cast<float*>(output.ptr<float>()), M, K);
-  }
-  else {
-    matmul_kernel_cu_fp32int8<128, 1><<<K, 128>>>(
-      input.ptr<float>(), weight.ptr<int8_t>(), scale.ptr<float>(), group_size,
-      const_cast<float*>(output.ptr<float>()), M, K);
+  } else {
+    matmul_kernel_cu_fp32int8<128, 1><<<K, 128>>>(input.ptr<float>(), weight.ptr<int8_t>(),
+                                                  scale.ptr<float>(), group_size,
+                                                  const_cast<float*>(output.ptr<float>()), M, K);
   }
 }
 }  // namespace kernel

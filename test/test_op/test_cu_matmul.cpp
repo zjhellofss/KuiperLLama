@@ -74,3 +74,32 @@ TEST(test_matmul_cu, matmul_linear_course) {
   ASSERT_EQ(out_cpu.index<float>(1), 3);
   ASSERT_EQ(out_cpu.index<float>(2), 6);
 }
+
+TEST(test_matmul_cu, matmul_linear_course_cuda) {
+  auto alloc_cu = base::CUDADeviceAllocatorFactory::get_instance();
+  auto alloc_cpu = base::CPUDeviceAllocatorFactory::get_instance();
+
+  tensor::Tensor input(base::DataType::kDataTypeFp32, 3, true, alloc_cpu);
+  tensor::Tensor weight(base::DataType::kDataTypeFp32, 3, 3, true, alloc_cpu);
+
+  input.index<float>(0) = float(1);
+  input.index<float>(1) = float(1);
+  input.index<float>(2) = float(-1);
+
+  for (int i = 1; i <= 9; ++i) {
+    weight.index<float>(i - 1) = float(i);
+  }
+
+  input.to_cuda();
+  weight.to_cuda();
+
+  tensor::Tensor out_cu(base::DataType::kDataTypeFp32, 3, true, alloc_cu);
+
+  kernel::get_matmul_kernel(base::DeviceType::kDeviceCUDA)(input, weight, out_cu, 1.f, nullptr);
+
+  tensor::Tensor out_cpu = out_cu.clone();
+
+  ASSERT_EQ(out_cpu.index<float>(0), 0);
+  ASSERT_EQ(out_cpu.index<float>(1), 3);
+  ASSERT_EQ(out_cpu.index<float>(2), 6);
+}
