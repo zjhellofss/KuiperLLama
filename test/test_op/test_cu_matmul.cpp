@@ -98,6 +98,7 @@ TEST(test_matmul_cu, matmul_linear_course_cuda) {
   kernel::get_matmul_kernel(base::DeviceType::kDeviceCUDA)(input, weight, out_cu, 1.f, nullptr);
 
   tensor::Tensor out_cpu = out_cu.clone();
+  out_cpu.to_cpu();
 
   ASSERT_EQ(out_cpu.index<float>(0), 0);
   ASSERT_EQ(out_cpu.index<float>(1), 3);
