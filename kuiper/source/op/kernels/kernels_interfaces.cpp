@@ -12,6 +12,7 @@
 #include "cuda/add_kernel.cuh"
 #include "cuda/emb_kernel.cuh"
 #include "cuda/matmul_kernel.cuh"
+#include "cuda/matmul_cutlass.cuh"
 #include "cuda/mha_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
 #include "cuda/rope_kernel.cuh"
@@ -44,7 +45,11 @@ MatmulKernel get_matmul_kernel(base::DeviceType device_type) {
   if (device_type == base::DeviceType::kDeviceCPU) {
     return matmul_kernel_cpu;
   } else if (device_type == base::DeviceType::kDeviceCUDA) {
+#ifdef USE_CUTLASS
+    return matmul_cutlass;
+#else
     return matmul_kernel_cu;
+#endif
   } else {
     LOG(FATAL) << "Unknown device type for get an matmul kernel.";
     return nullptr;

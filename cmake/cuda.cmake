@@ -34,16 +34,22 @@ if (CUDA_FOUND)
 
     if (CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
         if (${CUDA_VERSION_STRING} VERSION_GREATER_EQUAL "11.1")
-            execute_process(COMMAND ${CMAKE_CUDA_COMPILER} --list-gpu-code RESULT_VARIABLE EXIT_CODE OUTPUT_VARIABLE OUTPUT_VAL)
-            if (EXIT_CODE EQUAL 0)
-                #Remove sm_
-                string(REPLACE "sm_" "" OUTPUT_VAL ${OUTPUT_VAL})
-                #Convert to list
-                string(REPLACE "\n" ";" __CUDA_ARCH_BIN ${OUTPUT_VAL})
-                #Remove last empty entry
-                list(REMOVE_AT __CUDA_ARCH_BIN -1)
+            if (USE_CUTLASS)
+                # https://github.com/NVIDIA/cutlass/pull/1664
+                # current cutlass <= 3.5.0 functional.h hrsqrt doesn't work for sm <= 5.2
+                set(__CUDA_ARCH_BIN "60;61;62;70;72;75;80;86;80;86")
             else ()
-                message(FATAL_ERROR "Failed to run NVCC to get list of GPU codes: ${EXIT_CODE}")
+                execute_process(COMMAND ${CMAKE_CUDA_COMPILER} --list-gpu-code RESULT_VARIABLE EXIT_CODE OUTPUT_VARIABLE OUTPUT_VAL)
+                if (EXIT_CODE EQUAL 0)
+                    #Remove sm_
+                    string(REPLACE "sm_" "" OUTPUT_VAL ${OUTPUT_VAL})
+                    #Convert to list
+                    string(REPLACE "\n" ";" __CUDA_ARCH_BIN ${OUTPUT_VAL})
+                    #Remove last empty entry
+                    list(REMOVE_AT __CUDA_ARCH_BIN -1)
+                else ()
+                    message(FATAL_ERROR "Failed to run NVCC to get list of GPU codes: ${EXIT_CODE}")
+                endif ()
             endif ()
         elseif (${CUDA_VERSION_STRING} VERSION_GREATER_EQUAL "11.0")
             # set(__CUDA_ARCH_BIN "35;37;50;52;53;60;61;62;70;72;75;80;86")

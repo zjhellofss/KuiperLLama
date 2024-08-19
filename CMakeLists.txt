@@ -6,6 +6,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
 project(llama_infer CXX CUDA)
+
+option(USE_CUTLASS "Use cutlass for matrix multiplication" OFF)
+if(USE_CUTLASS)
+  add_compile_definitions(USE_CUTLASS)
+endif()
 include(cmake/cuda.cmake)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -45,6 +50,16 @@ if(USE_CPM)
     GITHUB_REPOSITORY google/sentencepiece
     VERSION 0.2.0
   )
+
+  if (USE_CUTLASS)
+    CPMAddPackage(
+      NAME cutlass
+      GITHUB_REPOSITORY NVIDIA/cutlass
+      VERSION 3.5.0
+      OPTIONS "CUTLASS_ENABLE_HEADERS_ONLY ON"
+    )
+  endif()
+
   find_package(sentencepiece REQUIRED)
 endif()
 
@@ -71,6 +86,10 @@ target_include_directories(llama PUBLIC ${glog_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${PROJECT_SOURCE_DIR}/kuiper/include)
 target_include_directories(llama PUBLIC ${Armadillo_INCLUDE_DIR})
 target_include_directories(llama PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+if (USE_CUTLASS)
+  target_include_directories(llama PUBLIC ${cutlass_SOURCE_DIR}/include)
+  target_include_directories(llama PUBLIC ${cutlass_SOURCE_DIR}/tools/util/include)
+endif()
 
 if(USE_CPM)
   # Add sentencepiece include directory
