@@ -50,15 +50,28 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
   if (head >= head_num) {
     return;
   }
-
   float* query_head = query + head * head_size;
   float* score_head = score_ptr + head * seq_len;
   float scale = 1.f / sqrtf(head_size);
   int32_t head_offset = (head / kv_mul) * head_size;
   for (int t = threadIdx.x; t <= pos; t += blockDim.x) {
     float* key_head = key_cache + layer_offset + t * kv_dim + head_offset;
-
+    /**
+     *  在Meta的Llama注意力机制实现中，head_dim等于head_size。
+     *
+     *  xq = xq.transpose(1, 2)  # 转置后形状为 (heads, sequence_length, head_dim)
+     *                            # 如果sequence_length为1，则形状简化为 (heads, head_dim)
+     *  keys = keys.transpose(1, 2)  # 同样转置keys，得到形状 (heads, sequence_length, head_dim)
+     *                              # 若sequence_length为1，则形状也简化为 (heads, head_dim)
+     *
+     *  在我们的代码实现中，计算公式为 (head / kv_mul) * head_size。
+     *  其中，在多头注意力（MHA）机制里，kv_mul的值为1，
+     *  因此计算得到的head_offset就等于head * head_size。
+     *
+     *  这里的head_offset用于定位到当前处理的头部（head），而t * kv_dim (即t * dim)则用于定位到历史的key向量。
+     */
     float score = 0.0f;
+    // query @ key 逐个头相乘，从上面的代码可以看出
 #pragma unroll
     for (int i = 0; i < head_size; i += 4) {
       float4 key_head_float4 = *reinterpret_cast<float4*>(key_head + i);
