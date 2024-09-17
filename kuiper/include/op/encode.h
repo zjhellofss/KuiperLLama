@@ -15,6 +15,8 @@ class EncodeLayer : public Layer {
 
   std::string decode(int32_t token_id) const;
 
+  std::string decode(const std::vector<int32_t>& token_ids) const;
+
   int32_t eos() const;
 
  private:

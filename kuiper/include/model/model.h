@@ -38,6 +38,8 @@ class Model {
 
   virtual std::string decode(int32_t token_idx) const = 0;
 
+  virtual std::string decode(std::vector<int32_t> token_idxs) const = 0;
+
  protected:
   virtual base::Status insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor);
 

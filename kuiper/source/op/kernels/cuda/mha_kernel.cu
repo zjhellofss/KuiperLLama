@@ -99,12 +99,12 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
   __syncthreads();
 
   float* output_head = output + head * head_size;
-  head_offset = layer_offset + (head / kv_mul) * head_size;
+  int32_t val_offset = layer_offset + (head / kv_mul) * head_size;
   for (int i = threadIdx.x; i < head_size; i += blockDim.x) {
     float value = 0.0f;
 #pragma unroll
     for (int t = 0; t <= pos; t++) {
-      float* value_head = value_cache + head_offset + t * kv_dim;
+      float* value_head = value_cache + val_offset + t * kv_dim;
       float score = score_head[t];
       value += score * value_head[i];
     }

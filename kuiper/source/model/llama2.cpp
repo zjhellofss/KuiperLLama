@@ -433,6 +433,11 @@ std::string LLama2Model::decode(int32_t token_idx) const {
   return this->encode_layer_->decode(token_idx);
 }
 
+std::string LLama2Model::decode(std::vector<int32_t> token_idxs) const {
+  CHECK(this->encode_layer_ != nullptr);
+  return this->encode_layer_->decode(token_idxs);
+}
+
 void LLama2Model::init_mem() {
   std::shared_ptr<base::DeviceAllocator> alloc;
   if (device_type_ == base::DeviceType::kDeviceCPU) {

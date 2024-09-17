@@ -2,7 +2,7 @@
 #include <glog/logging.h>
 namespace op {
 EncodeLayer::EncodeLayer(base::DeviceType device_type)
-    : Layer(device_type, LayerType::kLayerEncode,  "Encode") {}
+    : Layer(device_type, LayerType::kLayerEncode, "Encode") {}
 
 EncodeLayer::EncodeLayer(
     base::DeviceType device_type, bool has_bos, bool has_eos,
@@ -33,6 +33,11 @@ std::vector<int32_t> EncodeLayer::encode(const std::string& sentence) const {
 std::string EncodeLayer::decode(int32_t token_id) const {
   CHECK(spe != nullptr);
   std::vector<int32_t> token_ids{token_id};
+  return this->spe->DecodeIds(token_ids);
+}
+
+std::string EncodeLayer::decode(const std::vector<int32_t>& token_ids) const {
+  CHECK(spe != nullptr);
   return this->spe->DecodeIds(token_ids);
 }
 }  // namespace op
