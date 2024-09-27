@@ -92,6 +92,36 @@ TEST(test_tensor, to_cu) {
   delete[] p2;
 }
 
+TEST(test_tensor, init1) {
+  using namespace base;
+  auto alloc_cu = base::CPUDeviceAllocatorFactory::get_instance();
+
+  int32_t size = 32 * 151;
+
+  tensor::Tensor t1(base::DataType::kDataTypeFp32, size, true, alloc_cu);
+  ASSERT_EQ(t1.is_empty(), false);
+}
+
+TEST(test_tensor, init3) {
+  using namespace base;
+  float* ptr = new float[32];
+  ptr[0] = 31;
+  tensor::Tensor t1(base::DataType::kDataTypeFp32, 32, false, nullptr, ptr);
+  ASSERT_EQ(t1.is_empty(), false);
+  ASSERT_EQ(t1.ptr<float>(), ptr);
+  ASSERT_EQ(*t1.ptr<float>(), 31);
+}
+
+TEST(test_tensor, init2) {
+  using namespace base;
+  auto alloc_cu = base::CPUDeviceAllocatorFactory::get_instance();
+
+  int32_t size = 32 * 151;
+
+  tensor::Tensor t1(base::DataType::kDataTypeFp32, size, false, alloc_cu);
+  ASSERT_EQ(t1.is_empty(), true);
+}
+
 TEST(test_tensor, assign1) {
   using namespace base;
   auto alloc_cpu = CPUDeviceAllocatorFactory::get_instance();

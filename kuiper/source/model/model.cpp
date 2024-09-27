@@ -2,9 +2,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 namespace model {
-Model::Model(base::ModelType model_type, std::string token_path, std::string model_path,
-             bool is_quant_model)
-    : model_type_(model_type),
+Model::Model(base::TokenizerType tokenizer_type, base::ModelType model_type, std::string token_path,
+             std::string model_path, bool is_quant_model)
+    : tokenizer_type_(tokenizer_type),
+      model_type_(model_type),
       token_path_(std::move(token_path)),
       model_path_(std::move(model_path)),
       is_quant_model_(is_quant_model) {}
@@ -129,22 +130,22 @@ base::Status Model::generate_model_infos(const ModelConfig& config) const {
 
 base::Status Model::create_encode_layer() {
   using namespace base;
-  std::unique_ptr<sentencepiece::SentencePieceProcessor> spe =
-      std::make_unique<sentencepiece::SentencePieceProcessor>();
-  const auto& status = spe->Load(token_path_);
-  if (!status.ok()) {
-    return error::PathNotValid(token_path_);
-  }
-
-  config_->vocab_size_ = spe->GetPieceSize();
-  if (config_->vocab_size_ <= 0) {
-    return error::InternalError("The vocab size param read error from the model file!");
-  }
 
   // create token encode decode layer
-  encode_layer_ = std::make_unique<op::EncodeLayer>(device_type_, true, false, std::move(spe));
+  if (tokenizer_type_ == TokenizerType::kEncodeSpe) {
+    encode_layer_ = std::make_unique<op::SpeEncodeLayer>(this->token_path_, true, false);
+  } else {
+#ifdef LLAMA3_SUPPORT
+    encode_layer_ = std::make_unique<op::BpeEncodeLayer>(this->token_path_, true, false);
+#endif
+  }
   if (!encode_layer_) {
     return error::InternalError("Create the encode layer failed.");
+  }
+
+  config_->vocab_size_ = encode_layer_->vocab_size();
+  if (config_->vocab_size_ <= 0) {
+    return error::InternalError("The vocab size param read error from the model file!");
   }
   return error::Success();
 }

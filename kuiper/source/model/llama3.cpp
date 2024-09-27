@@ -1,4 +1,4 @@
-#include "model/llama2.h"
+#include "model/llama3.h"
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 #include <op/matmul.h>
@@ -99,9 +99,10 @@ void LLama2Layers::to_cuda(std::shared_ptr<kernel::CudaConfig> config) {
   }
 }
 
-LLama2Model::LLama2Model(std::string token_path, std::string model_path, bool is_quant_model)
-    : Model(base::ModelType::kModelTypeLLama2, std::move(token_path), std::move(model_path),
-            is_quant_model) {}
+LLama2Model::LLama2Model(base::TokenizerType tokenizer_type, std::string token_path,
+                         std::string model_path, bool is_quant_model)
+    : Model(tokenizer_type, base::ModelType::kModelTypeLLama2, std::move(token_path),
+            std::move(model_path), is_quant_model) {}
 
 base::Status LLama2Model::init(base::DeviceType device_type) {
   using namespace base;
@@ -423,9 +424,9 @@ std::vector<int32_t> LLama2Model::encode(const std::string& sentence) const {
   return encode_layer_->encode(sentence);
 }
 
-int32_t LLama2Model::get_eos() const {
+bool LLama2Model::is_sentence_ending(int32_t token_idx) const {
   CHECK(this->encode_layer_ != nullptr);
-  return this->encode_layer_->eos();
+  return this->encode_layer_->is_sentence_ending(token_idx);
 }
 
 std::string LLama2Model::decode(int32_t token_idx) const {
@@ -631,6 +632,7 @@ op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const
       << "The embedding layer in the llama2 model is null pointer.";
   STATUS_CHECK(
       llama_layers_->embedding_layer_->forward(input_tokens, input_token_num, input_embeddings));
+
   op::EmbeddingOutput output(input_tokens, input_embeddings, input_token_num);
   return output;
 }

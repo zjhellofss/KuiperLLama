@@ -32,7 +32,8 @@ struct LLama2Layers {
 
 class LLama2Model : public Model {
  public:
-  explicit LLama2Model(std::string token_path, std::string model_path, bool is_quant_model);
+  explicit LLama2Model(base::TokenizerType tokenizer_type, std::string token_path,
+                       std::string model_path, bool is_quant_model);
 
   base::Status init(base::DeviceType device_type) override;
 
@@ -44,14 +45,14 @@ class LLama2Model : public Model {
 
   std::vector<int32_t> encode(const std::string& sentence) const override;
 
-  int32_t get_eos() const override;
-
   std::string decode(int32_t token_idx) const override;
 
   std::string decode(std::vector<int32_t> token_idxs) const override;
 
   std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
                                                            int32_t token_pos) const override;
+
+  bool is_sentence_ending(int32_t token_idx) const override;
 
   op::EmbeddingOutput embedding(const std::vector<int>& tokens) const;
 

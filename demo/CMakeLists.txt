@@ -1,4 +1,11 @@
+
 add_executable(llama_infer main.cpp)
 target_link_directories(llama_infer PUBLIC ${PROJECT_SOURCE_DIR}/lib)
 target_link_libraries(llama_infer llama)
+if (LLAMA3_SUPPORT)
+    message(STATUS "LINK LLAMA3 SUPPORT")
+    find_package(absl REQUIRED)
+    find_package(re2 REQUIRED)
+    target_link_libraries(llama_infer absl::base re2::re2)
+endif ()
 set_target_properties(llama_infer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
