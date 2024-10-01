@@ -68,7 +68,8 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
      *  其中，在多头注意力（MHA）机制里，kv_mul的值为1，
      *  因此计算得到的head_offset就等于head * head_size。
      *
-     *  这里的head_offset用于定位到当前处理的头部（head），而t * kv_dim (即t * dim)则用于定位到历史的key向量。
+     *  这里的head_offset用于定位到当前处理的头部（head），而t * kv_dim (即t *
+     * dim)则用于定位到历史的key向量。
      */
     float score = 0.0f;
     // query @ key 逐个头相乘，从上面的代码可以看出
@@ -76,18 +77,10 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
     for (int i = 0; i < head_size; i += 4) {
       float4 key_head_float4 = *reinterpret_cast<float4*>(key_head + i);
       float4 query_head_float4 = *reinterpret_cast<float4*>(query_head + i);
-      if (i < head_size) {
-        score += key_head_float4.x * query_head_float4.x;
-      }
-      if (i + 1 < head_size) {
-        score += key_head_float4.y * query_head_float4.y;
-      }
-      if (i + 2 < head_size) {
-        score += key_head_float4.z * query_head_float4.z;
-      }
-      if (i + 3 < head_size) {
-        score += key_head_float4.w * query_head_float4.w;
-      }
+      score += key_head_float4.x * query_head_float4.x;
+      score += key_head_float4.y * query_head_float4.y;
+      score += key_head_float4.z * query_head_float4.z;
+      score += key_head_float4.w * query_head_float4.w;
     }
 
     score *= scale;
