@@ -32,8 +32,7 @@ if (CUDA_FOUND)
 
     set(HAVE_CUDA TRUE)
 
-
-    set(CMAKE_CUDA_ARCHITECTURES "86")
+    set(CMAKE_CUDA_ARCHITECTURES "75;80;86")
 
     set(CMAKE_CUDA_COMPILER_LIBRARY_ROOT /usr/local/cuda)
 else ()
