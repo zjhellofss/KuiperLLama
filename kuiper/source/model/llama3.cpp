@@ -364,6 +364,7 @@ void LLama2Model::create_param_layers() {
 
   // skip final rms weight
   pos += dim;
+  // skip freqs_cos and freqs_sin weight
   pos += config_->seq_len_ * config_->head_size_;
 
   llama_layers_->cls_layer_ =
@@ -390,6 +391,7 @@ void LLama2Model::create_param_layers() {
     rmsnorm_pos += config_->dim_;
   }
 
+  // skip attention.wq attention.wk attention.wv attention.wo
   rmsnorm_pos += config_->layer_num_ * config_->dim_ * config_->dim_;
   rmsnorm_pos +=
       config_->layer_num_ * config_->dim_ * (config_->kv_head_num_ * config_->head_size_);
@@ -407,6 +409,7 @@ void LLama2Model::create_param_layers() {
     rmsnorm_pos += config_->dim_;
   }
 
+  // skip ffn.w1 ffn.w2 ffn.w3
   rmsnorm_pos += config_->layer_num_ * config_->hidden_dim_ * config_->dim_;
   rmsnorm_pos += config_->layer_num_ * config_->hidden_dim_ * config_->dim_;
   rmsnorm_pos += config_->layer_num_ * config_->hidden_dim_ * config_->dim_;

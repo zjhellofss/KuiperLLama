@@ -154,7 +154,7 @@ base::Status Model::gen_model_from_file() {
   using namespace base;
   config_ = std::make_unique<TransformerConfig>();
 
-  // init s entence piece processor
+  // init sentence piece processor
   // google sentence piece
   auto create_encode_status = create_encode_layer();
   if (!create_encode_status) {
