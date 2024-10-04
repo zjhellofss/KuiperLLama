@@ -3,6 +3,7 @@
 #include <cub/cub.cuh>
 #include "mha_kernel.cuh"
 namespace kernel {
+constexpr static int thread_num = 256;
 __device__ void softmax_gpu(float* __restrict__ x, int size) {
   int tid = threadIdx.x;
   int step = blockDim.x;
@@ -14,7 +15,7 @@ __device__ void softmax_gpu(float* __restrict__ x, int size) {
       max_val = x[i];
     }
   }
-  using BlockReduce = cub::BlockReduce<float, 128>;
+  using BlockReduce = cub::BlockReduce<float, thread_num>;
   __shared__ BlockReduce::TempStorage temp;
   __shared__ float shared_val;
   max_val = BlockReduce(temp).Reduce(max_val, cub::Max());
@@ -50,10 +51,11 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
   if (head >= head_num) {
     return;
   }
+
+  float scale = 1.f / sqrtf(head_size);
   float* query_head = query + head * head_size;
   float* score_head = score_ptr + head * seq_len;
-  float scale = 1.f / sqrtf(head_size);
-  int32_t head_offset = (head / kv_mul) * head_size;
+  int head_offset = (head / kv_mul) * head_size;
   for (int t = threadIdx.x; t <= pos; t += blockDim.x) {
     float* key_head = key_cache + layer_offset + t * kv_dim + head_offset;
     /**
@@ -71,8 +73,9 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
      *  这里的head_offset用于定位到当前处理的头部（head），而t * kv_dim (即t *
      * dim)则用于定位到历史的key向量。
      */
-    float score = 0.0f;
+
     // query @ key 逐个头相乘，从上面的代码可以看出
+    float score = 0.0f;
 #pragma unroll
     for (int i = 0; i < head_size; i += 4) {
       float4 key_head_float4 = *reinterpret_cast<float4*>(key_head + i);
@@ -92,12 +95,11 @@ __global__ void multi_head_attention_kernel(int32_t pos, int32_t seq_len, float*
   __syncthreads();
 
   float* output_head = output + head * head_size;
-  int32_t val_offset = layer_offset + (head / kv_mul) * head_size;
   for (int i = threadIdx.x; i < head_size; i += blockDim.x) {
     float value = 0.0f;
 #pragma unroll
     for (int t = 0; t <= pos; t++) {
-      float* value_head = value_cache + val_offset + t * kv_dim;
+      float* value_head = value_cache + layer_offset + t * kv_dim + head_offset;
       float score = score_head[t];
       value += score * value_head[i];
     }
@@ -112,7 +114,6 @@ void mha_kernel_cu(int32_t pos, int32_t head_num, int32_t layer_index, int32_t s
                    base::DeviceType device_type, CudaConfig* config) {
   UNUSED(device_type);
   int32_t layer_offset = layer_index * seq_len * kv_dim;
-  int32_t thread_num = 128;
   float* query = const_cast<float*>(query_tensor.ptr<float>());
   float* score = const_cast<float*>(score_tensor.ptr<float>());
   float* output = const_cast<float*>(mha_out.ptr<float>());
