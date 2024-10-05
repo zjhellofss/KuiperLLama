@@ -1,7 +1,53 @@
 #include "rope_kernel.cuh"
 namespace kernel {
 
-#ifdef QWEN2_SUPPORT
+#if defined (LLAMA3_SUPPORT)
+__global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
+                                    const float* input_q, const float* input_k,
+                                    const float* sin_cache, const float* cos_cache) {
+  int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+  int num_heads = dim / head_size;
+  int head_pair_count = head_size / 2;
+  int total_pairs = num_heads * head_pair_count;
+  if (idx > total_pairs) {
+    return;
+  }
+
+  int head_idx = idx / head_pair_count;
+  int head_dim = idx % head_pair_count;
+
+  int i = head_idx * head_size;
+  int v0_idx = i + head_dim;
+  int v1_idx = i + head_dim + head_size / 2;
+
+  float fci = sin_cache[pos * head_size + head_dim * 2];
+  float fcr = cos_cache[pos * head_size + head_dim * 2];
+
+  int rotn = i < kv_dim ? 2 : 1;
+
+  for (int v = 0; v < rotn; v++) {
+    float* vec = const_cast<float*>(v == 0 ? input_q : input_k);  // the vector to rotate (query or key)
+    float v0 = vec[v0_idx];
+    float v1 = vec[v1_idx];
+    vec[v0_idx] = fcr * v0 - fci * v1;
+    vec[v1_idx] = fcr * v1 + fci * v0;
+  }
+}
+
+__global__ void sin_cos_calc(int head_size, int max_seq_len, float* sin_cache, float* cos_cache) {
+  int idx = threadIdx.x + blockDim.x * blockIdx.x;
+  int head_dim = idx % head_size;
+  for (int pos = 0; pos < max_seq_len; ++pos) {
+    float freq = 1.0f / pow(500000.0f, static_cast<float>(head_dim) / static_cast<float>(head_size));
+    float val = static_cast<float>(pos) * freq;
+    float fcr = cosf(val);
+    float fci = sinf(val);
+    *(sin_cache + pos * head_size + head_dim) = fci;
+    *(cos_cache + pos * head_size + head_dim) = fcr;
+  }
+}
+#elif defined (QWEN2_SUPPORT)
 __global__ void rope_kernel_cu_fp32(int pos, int dim, int kv_dim, int head_size,
                                     const float* input_q, const float* input_k,
                                     const float* sin_cache, const float* cos_cache) {
