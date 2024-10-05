@@ -50,7 +50,7 @@ int32_t SpeEncodeLayer::vocab_size() const {
   return spe->GetPieceSize();
 }
 
-#ifdef LLAMA3_SUPPORT
+#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT)
 static const std::string PAT_STR =
     R"((?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?:$|[^\S])|\s+)";
 
@@ -129,6 +129,43 @@ int32_t BpeEncodeLayer::vocab_size() const {
   CHECK(this->tiktoken_ != nullptr);
   return num_token_;
 }
+
+QwenEncodeLayer::QwenEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos)
+    : BpeEncodeLayer(std::move(token_model_path), has_bos, has_eos) {
+  using json = nlohmann::json;
+  std::ifstream f(token_model_path_);
+
+  json data = json::parse(f);
+  const auto& datas = data["added_tokens"];
+  ankerl::unordered_dense::map<std::string, int> special_tokens;
+  for (const auto& data1 : datas) {
+    int id = data1["id"];
+    std::string content = data1["content"];
+    special_tokens.insert({content, id});
+  }
+
+  ankerl::unordered_dense::map<std::string, int> encoder;
+  const auto& vocabs = data["model"]["vocab"];
+  const auto& vocab_items = vocabs.items();
+  for (const auto& v : vocab_items) {
+    const auto cpts = unicode_cpts_from_utf8(v.key());
+    std::string key;
+    for (const auto cpt : cpts) {
+        const auto utf8 = unicode_cpt_to_utf8(cpt);
+        key += unicode_utf8_to_byte(utf8);
+    }
+    const int32_t id = v.value();
+    encoder[key] = id;
+  }
+  bos_id_ = special_tokens["<|im_start|>"];
+  eos_id_ = special_tokens["<|im_end|>"];
+  stop_token1_ = eos_id_;
+  stop_token2_ = special_tokens["<|endoftext|>"];
+
+  num_token_ = encoder.size() + special_tokens.size();
+  tiktoken_ = std::make_unique<tiktoken::tiktoken>(encoder, special_tokens, PAT_STR);
+}
+
 
 #endif
 }  // namespace op

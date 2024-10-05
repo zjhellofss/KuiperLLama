@@ -13,6 +13,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 14)
 
+option(LLAMA3_SUPPORT OFF)
+if (LLAMA3_SUPPORT)
+  message(STATUS "LLAMA3 SUPPORT")
+  add_definitions(-DLLAMA3_SUPPORT)
+endif()
+option(QWEN2_SUPPORT OFF)
+if (QWEN2_SUPPORT)
+  message(STATUS "QWEN2 SUPPORT")
+  add_definitions(-DQWEN2_SUPPORT)
+endif()
 # ---- Add dependencies via CPM ----
 # see https://github.com/TheLartians/CPM.cmake for more info
 option(USE_CPM "Use CPM for dependency management" OFF)
@@ -46,6 +56,25 @@ if(USE_CPM)
     VERSION 0.2.0
   )
   find_package(sentencepiece REQUIRED)
+
+  if (LLAMA3_SUPPORT OR QWEN2_SUPPORT)
+    CPMAddPackage(
+        NAME absl
+        GITHUB_REPOSITORY abseil/abseil-cpp
+        GIT_TAG 20240722.0
+        OPTIONS "BUILD_TESTING Off" "ABSL_PROPAGATE_CXX_STD ON" "ABSL_ENABLE_INSTALL ON"
+    )
+    CPMAddPackage(
+        NAME re2
+        GITHUB_REPOSITORY google/re2
+        GIT_TAG 2024-07-02
+    )
+    CPMAddPackage(
+        NAME nlohmann_json
+        GITHUB_REPOSITORY nlohmann/json
+        VERSION 3.11.3
+    )
+  endif()
 endif()
 
 # ---------------------------------
@@ -81,9 +110,3 @@ endif()
 set_target_properties(llama PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 add_subdirectory(test)
 add_subdirectory(demo)
-
-option(LLAMA3_SUPPORT OFF)
-if (LLAMA3_SUPPORT)
-  message(STATUS "LLAMA3 SUPPORT")
-  add_definitions(-DLLAMA3_SUPPORT)
-endif()

@@ -121,10 +121,13 @@ base::Status Model::generate_model_infos(const ModelConfig& config) const {
     config_->is_shared_weight_ = false;
   }
 
-  if (std::abs(config.vocab_size) != config_->vocab_size_) {
-    return base::error::ModelParseError(
-        "Vocabulary size mismatch between the model file and the token list.");
-  }
+  // Qwen tokenizer size and embedding size is mismatched
+  // refer: https://github.com/QwenLM/Qwen2.5/issues/29
+  // if (std::abs(config.vocab_size) != config_->vocab_size_) {
+  //   return base::error::ModelParseError(
+  //       "Vocabulary size mismatch between the model file and the token list.");
+  // }
+  config_->vocab_size_ = std::abs(config.vocab_size);
   return base::error::Success();
 }
 
@@ -137,6 +140,10 @@ base::Status Model::create_encode_layer() {
   } else {
 #ifdef LLAMA3_SUPPORT
     encode_layer_ = std::make_unique<op::BpeEncodeLayer>(this->token_path_, true, false);
+#endif
+
+#ifdef QWEN2_SUPPORT
+    encode_layer_ = std::make_unique<op::QwenEncodeLayer>(this->token_path_, false, false);
 #endif
   }
   if (!encode_layer_) {
