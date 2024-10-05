@@ -59,7 +59,11 @@ void rmsnorm_kernel_cu(const tensor::Tensor& input, const tensor::Tensor& weight
         weight.device_type() == base::DeviceType::kDeviceCUDA &&
         output.device_type() == base::DeviceType::kDeviceCUDA);
 
+#ifdef QWEN2_SUPPORT
+  const float eps = 1e-6f;
+#else
   const float eps = 1e-5f;
+#endif
   const int32_t size = static_cast<int32_t>(input.size());
   float* in_ptr = const_cast<float*>(input.ptr<float>());
   float* wei_ptr = const_cast<float*>(weight.ptr<float>());

@@ -2,7 +2,7 @@
 #define KUIPER_INCLUDE_OP_ENCODE_H_
 #include <sentencepiece_processor.h>
 #include "layer.h"
-#ifdef LLAMA3_SUPPORT
+#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT)
 #include <absl/strings/str_join.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
@@ -54,7 +54,7 @@ class SpeEncodeLayer : public EncodeLayerBase {
   std::unique_ptr<sentencepiece::SentencePieceProcessor> spe;
 };
 
-#ifdef LLAMA3_SUPPORT
+#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT)
 class BpeEncodeLayer : public EncodeLayerBase {
 public:
   explicit BpeEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos);
@@ -69,13 +69,18 @@ public:
 
   int32_t vocab_size() const override;
 
- private:
+ protected:
   int32_t bos_id_ = -1;
   int32_t eos_id_ = -1;
   int32_t stop_token1_ = -1;
   int32_t stop_token2_ = -1;
   int32_t num_token_ = 0;
   std::unique_ptr<tiktoken::tiktoken> tiktoken_;
+};
+
+class QwenEncodeLayer : public BpeEncodeLayer {
+public:
+  explicit QwenEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos);
 };
 #endif
 

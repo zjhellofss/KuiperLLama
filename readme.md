@@ -121,3 +121,30 @@ python export.py llama2_7b.bin --meta-llama path/to/llama/model/7B
 ./llama_infer llama2_7b.bin tokenizer.model
 
 ```
+
+# Qwen2.5 推理
+
+- 以 Qwen2.5-0.5B 为例，huggingface 上下载模型：
+```shell
+export HF_ENDPOINT=https://hf-mirror.com
+pip3 install huggingface-cli
+huggingface-cli download --resume-download Qwen/Qwen2.5-0.5B --local-dir Qwen/Qwen2.5-0.5B --local-dir-use-symlinks False
+```
+- 导出模型：
+```shell
+python3 tools/export_qwen2.py Qwen2.5-0.5B.bin --hf=Qwen/Qwen2.5-0.5B
+```
+- 编译：
+```shell
+mkdir build 
+cd build
+# 开启 USE_CPM 选项，自动下载第三方依赖，前提是需要网络畅通
+cmake -DUSE_CPM=ON -DQWEN2_SUPPORT=ON .. 
+make -j16
+```
+- 运行：
+```shell
+./build/demo/qwen_infer Qwen2.5-0.5B.bin Qwen/Qwen2.5-0.5B/tokenizer.json
+# 和 huggingface 推理的结果进行对比
+python3 hf_infer/qwen2_infer.py
+```
