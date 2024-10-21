@@ -43,21 +43,7 @@ class LLama2Model : public Model {
   base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
                        int& next) const override;
 
-  std::vector<int32_t> encode(const std::string& sentence) const override;
-
-  std::string decode(int32_t token_idx) const override;
-
-  std::string decode(std::vector<int32_t> token_idxs) const override;
-
-  std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
-                                                           int32_t token_pos) const override;
-
-  bool is_sentence_ending(int32_t token_idx) const override;
-
-  op::EmbeddingOutput embedding(const std::vector<int>& tokens) const;
-
-  tensor::Tensor fill_input(const tensor::Tensor& pos_tensor,
-                            const op::EmbeddingOutput& embedding_output, bool is_prompt) const;
+  op::EmbeddingOutput embedding(const std::vector<int>& tokens) const override;
 
  private:
   void init_mem() override;

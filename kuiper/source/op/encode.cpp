@@ -1,6 +1,6 @@
 #include "op/encode.h"
-#include "base/unicode.h"
 #include <glog/logging.h>
+#include "base/unicode.h"
 namespace op {
 
 // EncodeLayer::EncodeLayer(
@@ -23,8 +23,13 @@ std::string SpeEncodeLayer::decode(const std::vector<int32_t>& token_ids) const 
 
 SpeEncodeLayer::SpeEncodeLayer(std::string token_model_path, bool has_bos, bool has_eos)
     : EncodeLayerBase(std::move(token_model_path), has_bos, has_eos) {
+  using namespace sentencepiece::util;
   spe = std::make_unique<sentencepiece::SentencePieceProcessor>();
-  spe->Load(token_model_path_);
+  auto rc = spe->Load(token_model_path_);
+  if (rc.code() != StatusCode::kOk) {
+    LOG(FATAL)
+        << "The token model path is not valid, please check the path and type of token model.";
+  }
 }
 
 std::vector<int32_t> SpeEncodeLayer::encode(const std::string& sentence) const {
@@ -50,7 +55,7 @@ int32_t SpeEncodeLayer::vocab_size() const {
   return spe->GetPieceSize();
 }
 
-#if defined (LLAMA3_SUPPORT) || defined (QWEN2_SUPPORT)
+#if defined(LLAMA3_SUPPORT) || defined(QWEN2_SUPPORT)
 static const std::string PAT_STR =
     R"((?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?:$|[^\S])|\s+)";
 
@@ -58,8 +63,16 @@ BpeEncodeLayer::BpeEncodeLayer(std::string token_model_path, bool has_bos, bool 
     : EncodeLayerBase(std::move(token_model_path), has_bos, has_eos) {
   using json = nlohmann::json;
   std::ifstream f(token_model_path_);
+  CHECK(f.is_open())
+      << "The token model path is not valid, please check the path and type of token model.";
+  json data;
+  try {
+    data = json::parse(f);
+  } catch (json::parse_error&) {
+    LOG(FATAL)
+        << "The token model path is not valid, please check the path and type of token model.";
+  }
 
-  json data = json::parse(f);
   const auto& datas = data["added_tokens"];
   ankerl::unordered_dense::map<std::string, int> special_tokens;
   for (const auto& data1 : datas) {
@@ -75,8 +88,8 @@ BpeEncodeLayer::BpeEncodeLayer(std::string token_model_path, bool has_bos, bool 
     const auto cpts = unicode_cpts_from_utf8(v.key());
     std::string key;
     for (const auto cpt : cpts) {
-        const auto utf8 = unicode_cpt_to_utf8(cpt);
-        key += unicode_utf8_to_byte(utf8);
+      const auto utf8 = unicode_cpt_to_utf8(cpt);
+      key += unicode_utf8_to_byte(utf8);
     }
     const int32_t id = v.value();
     encoder[key] = id;
@@ -151,8 +164,8 @@ QwenEncodeLayer::QwenEncodeLayer(std::string token_model_path, bool has_bos, boo
     const auto cpts = unicode_cpts_from_utf8(v.key());
     std::string key;
     for (const auto cpt : cpts) {
-        const auto utf8 = unicode_cpt_to_utf8(cpt);
-        key += unicode_utf8_to_byte(utf8);
+      const auto utf8 = unicode_cpt_to_utf8(cpt);
+      key += unicode_utf8_to_byte(utf8);
     }
     const int32_t id = v.value();
     encoder[key] = id;
@@ -165,7 +178,6 @@ QwenEncodeLayer::QwenEncodeLayer(std::string token_model_path, bool has_bos, boo
   num_token_ = encoder.size() + special_tokens.size();
   tiktoken_ = std::make_unique<tiktoken::tiktoken>(encoder, special_tokens, PAT_STR);
 }
-
 
 #endif
 }  // namespace op

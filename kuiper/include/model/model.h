@@ -1,5 +1,6 @@
 #ifndef KUIPER_INCLUDE_MODEL_MODEL_H_
 #define KUIPER_INCLUDE_MODEL_MODEL_H_
+#include <op/embedding.h>
 #include <map>
 #include <string>
 #include "config.h"
@@ -34,11 +35,24 @@ class Model {
 
   virtual const tensor::Tensor& get_buffer(ModelBufferType buffer_idx) const;
 
-  virtual bool is_sentence_ending(int32_t token_idx) const = 0;
+  virtual bool is_sentence_ending(int32_t token_idx) const;
 
-  virtual std::string decode(int32_t token_idx) const = 0;
+  virtual std::string decode(int32_t token_idx) const;
 
-  virtual std::string decode(std::vector<int32_t> token_idxs) const = 0;
+  virtual std::string decode(std::vector<int32_t> token_idxs) const;
+
+  /////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////
+  virtual std::vector<int32_t> encode(const std::string& sentence) const;
+
+  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
+                                                                   int32_t token_pos) const;
+
+  virtual op::EmbeddingOutput embedding(const std::vector<int>& tokens) const = 0;
+
+  virtual tensor::Tensor fill_input(const tensor::Tensor& pos_tensor,
+                                    const op::EmbeddingOutput& embedding_output,
+                                    bool is_prompt) const;
 
  protected:
   virtual base::Status insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor);
@@ -57,11 +71,6 @@ class Model {
   virtual void init_mem() = 0;
 
   virtual base::Status create_layers() = 0;
-
-  virtual std::vector<int32_t> encode(const std::string& sentence) const = 0;
-
-  virtual std::pair<tensor::Tensor, tensor::Tensor> slice_kv_cache(int32_t layer_idx,
-                                                                   int32_t token_pos) const = 0;
 
   virtual void create_param_layers() = 0;
 

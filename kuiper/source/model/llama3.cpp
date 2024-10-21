@@ -422,26 +422,6 @@ void LLama2Model::create_param_layers() {
   llama_layers_->rmsnorm_layers_.push_back(rms_final_layer);
 }
 
-std::vector<int32_t> LLama2Model::encode(const std::string& sentence) const {
-  CHECK(encode_layer_ != nullptr);
-  return encode_layer_->encode(sentence);
-}
-
-bool LLama2Model::is_sentence_ending(int32_t token_idx) const {
-  CHECK(this->encode_layer_ != nullptr);
-  return this->encode_layer_->is_sentence_ending(token_idx);
-}
-
-std::string LLama2Model::decode(int32_t token_idx) const {
-  CHECK(this->encode_layer_ != nullptr);
-  return this->encode_layer_->decode(token_idx);
-}
-
-std::string LLama2Model::decode(std::vector<int32_t> token_idxs) const {
-  CHECK(this->encode_layer_ != nullptr);
-  return this->encode_layer_->decode(token_idxs);
-}
-
 void LLama2Model::init_mem() {
   std::shared_ptr<base::DeviceAllocator> alloc;
   if (device_type_ == base::DeviceType::kDeviceCPU) {
@@ -517,29 +497,6 @@ void LLama2Model::init_mem() {
   }
 
   CHECK(insert_buffer(ModelBufferType::kForwardOutput, forward_output));
-}
-
-std::pair<tensor::Tensor, tensor::Tensor> LLama2Model::slice_kv_cache(int32_t layer_idx,
-                                                                      int32_t token_pos) const {
-  int32_t layer_offset = layer_idx * config_->seq_len_ * config_->kv_dim_;
-  int32_t cache_offset = layer_offset + token_pos * config_->kv_dim_;
-
-  float* key_cache_ptr =
-      const_cast<float*>(get_buffer(ModelBufferType::kKeyCache).ptr<float>(cache_offset));
-  float* val_cache_ptr =
-      const_cast<float*>(get_buffer(ModelBufferType::kValueCache).ptr<float>(cache_offset));
-
-  auto key_cache = std::make_shared<base::Buffer>(config_->kv_dim_ * sizeof(float), nullptr,
-                                                  key_cache_ptr, true);
-  auto val_cache = std::make_shared<base::Buffer>(config_->kv_dim_ * sizeof(float), nullptr,
-                                                  val_cache_ptr, true);
-  key_cache->set_device_type(device_type_);
-  val_cache->set_device_type(device_type_);
-  tensor::Tensor key(base::DataType::kDataTypeFp32, config_->kv_dim_);
-  tensor::Tensor val(base::DataType::kDataTypeFp32, config_->kv_dim_);
-  key.assign(key_cache);
-  val.assign(val_cache);
-  return {key, val};
 }
 
 base::Status LLama2Model::create_layers() {
@@ -638,26 +595,6 @@ op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const
 
   op::EmbeddingOutput output(input_tokens, input_embeddings, input_token_num);
   return output;
-}
-
-tensor::Tensor LLama2Model::fill_input(const tensor::Tensor& pos_tensor,
-                                       const op::EmbeddingOutput& embedding_output,
-                                       bool is_prompt) const {
-  const int32_t pos = pos_tensor.index<int32_t>(0);
-  auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
-
-  int32_t index = 0;
-  if (is_prompt) {
-    index = pos;
-  }
-  std::shared_ptr<base::Buffer> input_emb_buffer =
-      std::make_shared<base::Buffer>(config_->dim_ * sizeof(float), nullptr,
-                                     input_embeddings.ptr<float>(index * config_->dim_), true);
-
-  tensor::Tensor input(base::DataType::kDataTypeFp32, config_->dim_);
-  input.assign(input_emb_buffer);
-  input.set_device_type(device_type_);
-  return input;
 }
 
 void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) const {
