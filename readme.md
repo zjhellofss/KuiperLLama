@@ -29,23 +29,25 @@ https://l0kzvikuq0w.feishu.cn/docx/ZF2hd0xfAoaXqaxcpn2c5oHAnBc
 
 
 ## 第三方依赖
+> 借助企业级开发库，更快地搭建出大模型推理框架
 1. google glog https://github.com/google/glog
 2. google gtest https://github.com/google/googletest
 3. sentencepiece https://github.com/google/sentencepiece
 4. armadillo + openblas https://arma.sourceforge.net/download.html
 5. Cuda Toolkit
 
-**openblas作为armadillo的后端数学库，加速矩阵乘法等操作，也可以选用Intel-MKL，这个库用于CPU上的推理计算**
-
 
 ## 模型下载地址
 1. LLama2 https://pan.baidu.com/s/1PF5KqvIvNFR8yDIY1HmTYA?pwd=ma8r 或 https://huggingface.co/fushenshen/lession_model/tree/main
 
 2. Tiny LLama 
-* TinyLLama模型 https://huggingface.co/karpathy/tinyllamas/tree/main
-* TinyLLama分词器 https://huggingface.co/yahma/llama-7b-hf/blob/main/tokenizer.model
+- TinyLLama模型 https://huggingface.co/karpathy/tinyllamas/tree/main
+- TinyLLama分词器 https://huggingface.co/yahma/llama-7b-hf/blob/main/tokenizer.model
 
-**需要其他LLama结构的模型请看下一节模型导出**
+3. Qwen2.5/LLama
+   
+   请参考本项目配套课程，课程参加方式请看本文开头。
+
 
 ## 模型导出
 ```shell
