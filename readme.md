@@ -1,4 +1,4 @@
-# KuiperLLama 自制大模型推理框架
+# KuiperLLama 动手自制大模型推理框架，支持LLama2/3和Qwen2.5
 > News：新课发布，《动手自制大模型推理框架》，全手写cuda算子，课程框架支持LLama2和3.x以及Qwen2.5模型
 
 Hi，各位朋友们好！我是 KuiperInfer 的作者。KuiperInfer 作为一门开源课程，迄今已经在 GitHub 上已斩获 2.5k star。
