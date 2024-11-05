@@ -1,7 +1,7 @@
 #include "model/model.h"
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 namespace model {
 Model::Model(base::TokenizerType tokenizer_type, base::ModelType model_type, std::string token_path,
              std::string model_path, bool is_quant_model)
@@ -79,14 +79,26 @@ base::Status Model::read_model_file() {
     raw_model_data_ = std::make_shared<RawModelDataInt8>();
   }
 
-  struct stat sb;
-  if (fstat(fd, &sb) == -1) {
-      close(fd);
-      return error::ModelParseError(
-          "Failed to retrieve the file size information from the model "
-          "file.");
+  struct stat st;
+  if (fstat(fd, &st) == -1) {
+    close(fd);
+    return error::ModelParseError(
+        "Failed to retrieve the file size information from the model "
+        "file.");
   }
-  raw_model_data_->file_size = sb.st_size;
+  raw_model_data_->file_size = st.st_size;
+  LOG(INFO) << "The tokenizer model path: " << token_path_;
+  std::string tokenizer_type_str = tokenizer_type_ == TokenizerType::kEncodeBpe ? "Bpe" : "Spe";
+  LOG(INFO) << "The tokenizer type: " << tokenizer_type_str;
+
+  LOG(INFO) << "The model path: " << model_path_;
+  LOG(INFO) << "The model file size: " << raw_model_data_->file_size << " byte";
+  std::string quant_info = is_quant_model_ ? "quant" : "not quant";
+  LOG(INFO) << "The model is " << quant_info << " model";
+
+  if (config_) {
+    LOG(INFO) << "\nThe model info: " << *config_;
+  }
 
   raw_model_data_->fd = fd;
   raw_model_data_->data =
@@ -172,18 +184,19 @@ base::Status Model::gen_model_from_file() {
   // google sentence piece
   auto create_encode_status = create_encode_layer();
   if (!create_encode_status) {
-    LOG(ERROR) << "Create the encode layer failed!";
+    LOG(ERROR) << "Create the encode layer failed! " << create_encode_status.get_err_msg();
     return create_encode_status;
   }
   // mmap
   auto mmap_status = read_model_file();
   if (!mmap_status) {
-    LOG(ERROR) << "Handle model file " << model_path_ << " failed!";
+    LOG(ERROR) << "Read model file " << model_path_ << " failed! " << mmap_status.get_err_msg();
     return mmap_status;
   }
   auto layer_create_status = create_layers();
   if (!layer_create_status) {
-    LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed!";
+    LOG(ERROR) << "Create layers for the model file " << model_path_ << " failed! "
+               << mmap_status.get_err_msg();
     return layer_create_status;
   }
 
@@ -230,8 +243,8 @@ std::pair<tensor::Tensor, tensor::Tensor> Model::slice_kv_cache(int32_t layer_id
 }
 
 tensor::Tensor Model::fill_input(const tensor::Tensor& pos_tensor,
-                                       const op::EmbeddingOutput& embedding_output,
-                                       bool is_prompt) const {
+                                 const op::EmbeddingOutput& embedding_output,
+                                 bool is_prompt) const {
   const int32_t pos = pos_tensor.index<int32_t>(0);
   auto [input_tokens, input_embeddings, input_token_num] = embedding_output;
 

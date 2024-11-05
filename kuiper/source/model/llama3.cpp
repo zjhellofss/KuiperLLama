@@ -120,7 +120,7 @@ base::Status LLama2Model::init(base::DeviceType device_type) {
     cudaStreamCreate(&cuda_config_->stream);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
-      return error::InternalError("The cuda hanle create failed.");
+      return error::InternalError("The cuda handle create failed.");
     }
   }
 
