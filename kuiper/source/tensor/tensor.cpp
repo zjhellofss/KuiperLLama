@@ -114,7 +114,7 @@ void Tensor::to_cuda(cudaStream_t stream) {
                      stream);
     this->buffer_ = cu_buffer;
   } else {
-    LOG(INFO) << "The device type of the tensor is already cpu.";
+    LOG(INFO) << "The device type of the tensor is already cuda.";
   }
 }
 
@@ -132,7 +132,7 @@ void Tensor::to_cpu() {
                       base::MemcpyKind::kMemcpyCUDA2CPU);
     this->buffer_ = cpu_buffer;
   } else {
-    LOG(INFO) << "The device type of the tensor is already cuda.";
+    LOG(INFO) << "The device type of the tensor is already cpu.";
   }
 }
 
