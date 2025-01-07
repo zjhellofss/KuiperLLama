@@ -85,8 +85,8 @@ void Buffer::copy_from(const Buffer* buffer) const {
   CHECK(allocator_ != nullptr);
   CHECK(buffer != nullptr || buffer->ptr_ != nullptr);
 
-  size_t src_size = byte_size_;
-  size_t dest_size = buffer->byte_size_;
+  size_t dest_size = byte_size_;
+  size_t src_size = buffer->byte_size_;
   size_t byte_size = src_size < dest_size ? src_size : dest_size;
 
   const DeviceType& buffer_device = buffer->device_type();
