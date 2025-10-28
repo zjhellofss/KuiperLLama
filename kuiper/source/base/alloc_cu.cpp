@@ -9,7 +9,8 @@ void* CUDADeviceAllocator::allocate(size_t byte_size) const {
   cudaError_t state = cudaGetDevice(&id);
   CHECK(state == cudaSuccess);
   if (byte_size > 1024 * 1024) {
-    auto& big_buffers = big_buffers_map_[id];
+    // 显式初始化 big_buffers_map_ 中的项（如果需要） C++17
+    auto& big_buffers = big_buffers_map_.try_emplace(id, std::vector<CudaMemoryBuffer>()).first->second;
     int sel_id = -1;
     for (int i = 0; i < big_buffers.size(); i++) {
       if (big_buffers[i].byte_size >= byte_size && !big_buffers[i].busy &&
@@ -38,8 +39,8 @@ void* CUDADeviceAllocator::allocate(size_t byte_size) const {
     big_buffers.emplace_back(ptr, byte_size, true);
     return ptr;
   }
-
-  auto& cuda_buffers = cuda_buffers_map_[id];
+  // 显式初始化 cuda_buffers_map_ 中的项（如果需要） C++17
+  auto& cuda_buffers = cuda_buffers_map_.try_emplace(id, std::vector<CudaMemoryBuffer>()).first->second;
   for (int i = 0; i < cuda_buffers.size(); i++) {
     if (cuda_buffers[i].byte_size >= byte_size && !cuda_buffers[i].busy) {
       cuda_buffers[i].busy = true;
@@ -84,7 +85,6 @@ void CUDADeviceAllocator::release(void* ptr) const {
           temp.push_back(cuda_buffers[i]);
         }
       }
-      cuda_buffers.clear();
       it.second = temp;
       no_busy_cnt_[it.first] = 0;
     }
@@ -99,6 +99,9 @@ void CUDADeviceAllocator::release(void* ptr) const {
         return;
       }
     }
+    // 减少初始化多余的big_buffers_map_ 项
+    if (big_buffers_map_.find(it.first) == big_buffers_map_.end()) 
+      continue;
     auto& big_buffers = big_buffers_map_[it.first];
     for (int i = 0; i < big_buffers.size(); i++) {
       if (big_buffers[i].data == ptr) {
