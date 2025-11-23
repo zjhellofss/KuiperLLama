@@ -600,7 +600,7 @@ op::EmbeddingOutput LLama2Model::embedding(const std::vector<int>& tokens) const
 void LLama2Model::attention_rms(int32_t layer_idx, const tensor::Tensor& input) const {
   CHECK(llama_layers_ != nullptr);
   // attn rmsnorm
-  tensor::Tensor rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
+  tensor::Tensor& rmsnorm_output = get_buffer(ModelBufferType::kOutputRMSNorm);
   std::shared_ptr<op::Layer> rmsnorm_layer = llama_layers_->rmsnorm_layers_.at(layer_idx);
   if (!rmsnorm_layer) {
     LOG(FATAL) << "The attention rmsnorm layer is a null pointer in the llama2 model";
