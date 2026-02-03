@@ -3,6 +3,9 @@
 #include <op/embedding.h>
 #include <map>
 #include <string>
+#include <mutex>
+#include "base/base.h"
+#include "base/batch_metadata.h"
 #include "config.h"
 #include "op/encode.h"
 #include "op/layer.h"
@@ -10,7 +13,8 @@
 #include "sampler/argmax_sampler.h"
 #include "sentencepiece_processor.h"
 #include "tensor/tensor.h"
-
+#include "base/kv_cache_manager.h"
+#include "base/block_allocator.h"
 namespace model {
 class Model {
  public:
@@ -19,11 +23,56 @@ class Model {
 
   virtual base::Status init(base::DeviceType device_type) = 0;
 
+  // Legacy single-token interface (deprecated, calls forward_unified internally)
   virtual base::Status predict(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
                                bool is_prompt, int& next) const = 0;
 
+  // Legacy single-token forward (deprecated, calls forward_unified internally)
   virtual base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
                                int& next) const = 0;
+
+  // ============================================================================
+  // Unified forward interface - supports all scenarios:
+  // - Single token decode
+  // - Batch decode (multiple sequences, one token each)
+  // - Chunked prefill (single sequence, multiple tokens)
+  // - Mixed prefill + decode (continuous batching)
+  // ============================================================================
+  virtual base::Status forward_unified(
+      const tensor::Tensor& hidden_states,  // [num_tokens, dim]
+      const base::BatchMetadata& batch_meta,
+      std::vector<int32_t>& next_tokens) const;
+
+  // Convenience methods
+  base::Status forward_decode(
+      const std::vector<int32_t>& seq_ids,
+      const std::vector<int32_t>& positions,
+      const tensor::Tensor& hidden_states,
+      std::vector<int32_t>& next_tokens) const;
+
+  base::Status forward_prefill(
+      int32_t seq_id,
+      const tensor::Tensor& hidden_states,  // [num_tokens, dim]
+      int32_t start_pos,
+      int32_t& next_token) const;
+
+  // Chunked prefill: automatically splits long sequences into chunks
+  base::Status forward_chunked_prefill(
+      int32_t seq_id,
+      const tensor::Tensor& hidden_states,  // [total_tokens, dim]
+      int32_t start_pos,
+      int32_t chunk_size,  // 0 = auto-compute
+      int32_t& next_token) const;
+
+  // Compute optimal chunk size based on available memory
+  int32_t compute_chunk_size(int32_t total_tokens, int32_t num_active_seqs = 1) const;
+
+  virtual base::Status init_paged_kv_cache(int32_t num_seqs, int32_t block_size,
+                                           int32_t max_blocks,
+                                           int32_t max_blocks_per_seq = -1);
+
+  // Initialize unified buffers for variable token counts
+  virtual void init_unified_buffers(int32_t max_tokens);
 
   base::ModelType model_type() const;
 
@@ -54,6 +103,12 @@ class Model {
                                     const op::EmbeddingOutput& embedding_output,
                                     bool is_prompt) const;
 
+  // Get model configuration
+  const TransformerConfig* config() const { return config_.get(); }
+
+  // Get KV cache manager (for paged attention)
+  base::KVCacheManager* get_kv_cache_manager() const { return kv_cache_manager_.get(); }
+
  protected:
   virtual base::Status insert_buffer(ModelBufferType buffer_idx, const tensor::Tensor& tensor);
 
@@ -80,6 +135,12 @@ class Model {
 
  protected:
   int32_t group_size_ = 1;
+  int32_t num_seqs_ = 1;  // Number of sequences for batch processing
+  int32_t max_unified_tokens_ = 0;  // Max tokens for unified buffers
+  mutable std::mutex paged_kv_mutex_;
+  std::unique_ptr<base::BlockAllocator> block_allocator_;
+  std::unique_ptr<base::KVCacheManager> kv_cache_manager_;
+
   bool is_quant_model_ = false;
   std::unique_ptr<TransformerConfig> config_;
 
