@@ -101,6 +101,30 @@ Tensor::Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_al
   }
 }
 
+Tensor::Tensor(base::DataType data_type, size_t size, bool need_alloc,
+               std::shared_ptr<base::DeviceAllocator> alloc, void* ptr)
+    : data_type_(data_type), size_(size) {
+  // For large tensors, store size as a single dimension (may overflow int32_t, but size_ is correct)
+  // dims_ is used for shape info, size_ is used for actual allocation
+  if (size <= static_cast<size_t>(INT32_MAX)) {
+    dims_.push_back(static_cast<int32_t>(size));
+  } else {
+    // Store as two dimensions to avoid int32 overflow in dims_
+    // This is just for bookkeeping; actual size is in size_
+    dims_.push_back(INT32_MAX);
+    dims_.push_back(static_cast<int32_t>((size + INT32_MAX - 1) / INT32_MAX));
+  }
+  if (need_alloc && alloc) {
+    allocate(alloc);
+  } else {
+    if (ptr != nullptr) {
+      CHECK(need_alloc == false)
+          << "The need_alloc is true when ptr parameter is not a null pointer.";
+      init_buffer(alloc, data_type_, need_alloc, ptr);
+    }
+  }
+}
+
 void Tensor::to_cuda(cudaStream_t stream) {
   CHECK_NE(buffer_, nullptr);
   const base::DeviceType device_type = this->device_type();

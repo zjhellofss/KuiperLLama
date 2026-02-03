@@ -26,9 +26,36 @@ enum class ModelBufferType {
   kFFNRMSNorm = 13,
   kForwardOutput = 15,
   kForwardOutputCPU = 16,
-
   kSinCache = 17,
   kCosCache = 18,
+  kPagedKVCache = 19,
+  kPagedBlockTables = 20,
+  kPagedAttentionContextLens = 21,
+  // Batch buffers for multi-sequence processing
+  kBatchQuery = 22,           // [num_seqs, dim]
+  kBatchKey = 23,             // [num_seqs, kv_dim]
+  kBatchValue = 24,           // [num_seqs, kv_dim]
+  kBatchOutputMHA = 25,       // [num_seqs, dim]
+  kBatchAttnOutput = 26,      // [num_seqs, dim]
+  kBatchRMSNormOutput = 27,   // [num_seqs, dim]
+  kBatchW1Output = 28,        // [num_seqs, hidden_dim]
+  kBatchW3Output = 29,        // [num_seqs, hidden_dim]
+  kBatchW2Output = 30,        // [num_seqs, dim]
+  kBatchFFNRMSNorm = 31,      // [num_seqs, dim]
+  kBatchInputEmbeddings = 32, // [num_seqs, dim]
+  kBatchPositions = 33,       // [num_seqs] - positions for each sequence
+  kBatchForwardOutput = 34,   // [num_seqs, vocab_size] - logits for each sequence
+  // Unified forward buffers (for chunked prefill / continuous batching)
+  kUnifiedQuery = 35,         // [num_tokens, dim]
+  kUnifiedKey = 36,           // [num_tokens, kv_dim]
+  kUnifiedValue = 37,         // [num_tokens, kv_dim]
+  kUnifiedRMSNormOutput = 38, // [num_tokens, dim]
+  kUnifiedMHAOutput = 39,     // [num_tokens, dim]
+  kUnifiedAttnOutput = 40,    // [num_tokens, dim]
+  kUnifiedFFNRMSNorm = 41,    // [num_tokens, dim]
+  kUnifiedW1Output = 42,      // [num_tokens, hidden_dim]
+  kUnifiedW3Output = 43,      // [num_tokens, hidden_dim]
+  kUnifiedW2Output = 44,      // [num_tokens, dim]
 };
 }
 

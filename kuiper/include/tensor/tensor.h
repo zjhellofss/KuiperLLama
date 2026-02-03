@@ -14,7 +14,7 @@ class Tensor {
   explicit Tensor() = default;
 
   explicit Tensor(base::DataType data_type, int32_t dim0, bool need_alloc = false,
-                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr, void* ptr = nullptr);
+                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr,  void* ptr = nullptr);
 
   explicit Tensor(base::DataType data_type, int32_t dim0, int32_t dim1, bool need_alloc = false,
                   std::shared_ptr<base::DeviceAllocator> alloc = nullptr, void* ptr = nullptr);
@@ -28,6 +28,10 @@ class Tensor {
                   void* ptr = nullptr);
 
   explicit Tensor(base::DataType data_type, std::vector<int32_t> dims, bool need_alloc = false,
+                  std::shared_ptr<base::DeviceAllocator> alloc = nullptr, void* ptr = nullptr);
+
+  // Constructor for large tensors (size > INT32_MAX)
+  explicit Tensor(base::DataType data_type, size_t size, bool need_alloc = false,
                   std::shared_ptr<base::DeviceAllocator> alloc = nullptr, void* ptr = nullptr);
 
   void to_cpu();
