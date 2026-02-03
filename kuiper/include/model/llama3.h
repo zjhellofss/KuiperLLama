@@ -43,7 +43,27 @@ class LLama2Model : public Model {
   base::Status forward(const tensor::Tensor& input, const tensor::Tensor& pos_tensor,
                        int& next) const override;
 
+  // Unified forward interface - supports all scenarios
+  base::Status forward_unified(
+      const tensor::Tensor& hidden_states,  // [num_tokens, dim]
+      const base::BatchMetadata& batch_meta,
+      std::vector<int32_t>& next_tokens) const override;
+
   op::EmbeddingOutput embedding(const std::vector<int>& tokens) const override;
+
+  // Get cuda config for external use
+  std::shared_ptr<kernel::CudaConfig> get_cuda_config() const { return cuda_config_; }
+
+  // Initialize batch buffers for multi-sequence processing
+  void init_batch_buffers(int32_t num_seqs);
+
+  // Batch forward for multi-sequence decode (legacy, calls forward_unified internally)
+  // inputs: [num_seqs, dim] - one token per sequence
+  // positions: [num_seqs] - position for each sequence
+  // outputs: [num_seqs] - next token for each sequence
+  base::Status forward_batch(const tensor::Tensor& inputs,
+                             const tensor::Tensor& positions,
+                             std::vector<int32_t>& next_tokens) const;
 
  private:
   void init_mem() override;
@@ -58,6 +78,9 @@ class LLama2Model : public Model {
 
   void attention_mha(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
 
+  // Paged attention MHA for decode phase
+  void attention_mha_paged(int32_t layer_idx, const tensor::Tensor& pos_tensor) const;
+
   void attention_rms(int32_t layer_idx, const tensor::Tensor& input) const;
 
   void feed_forward(int32_t layer_idx, const tensor::Tensor& input) const;
@@ -67,6 +90,9 @@ class LLama2Model : public Model {
   void cls_logits(const tensor::Tensor& input) const;
 
   int32_t post_processing(const tensor::Tensor& pos, bool is_prompt) const override;
+
+  // Helper methods for unified forward
+  void ensure_unified_buffers(int32_t num_tokens) const;
 
  private:
   std::shared_ptr<kernel::CudaConfig> cuda_config_;

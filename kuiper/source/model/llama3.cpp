@@ -1,6 +1,7 @@
 #include "model/llama3.h"
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
+#include <cmath>
 #include <op/matmul.h>
 #include <op/mha.h>
 #include <op/rmsnorm.h>
@@ -8,6 +9,8 @@
 #include <utility>
 #include "../op/kernels/cpu/rope_kernel.h"
 #include "../op/kernels/cuda/rope_kernel.cuh"
+#include "../op/kernels/cuda/paged_attention_kernel.cuh"
+#include "../op/kernels/kernels_interface.h"
 #include "base/tick.h"
 namespace model {
 
@@ -153,12 +156,18 @@ base::Status LLama2Model::forward(const tensor::Tensor& input, const tensor::Ten
     return base::error::InternalError("Unsupported int8 quant in the cpu device");
   }
 
+  const bool use_paged_attention = (kv_cache_manager_ != nullptr);
+
   for (int32_t layer_idx = 0; layer_idx < config_->layer_num_; ++layer_idx) {
     attention_rms(layer_idx, input);
     // attention (wq wk wv @ input)
     attention_qkv(layer_idx, pos_tensor);
     // multi-head attention
-    attention_mha(layer_idx, pos_tensor);
+    if (use_paged_attention) {
+      attention_mha_paged(layer_idx, pos_tensor);
+    } else {
+      attention_mha(layer_idx, pos_tensor);
+    }
     // feed forward
     feed_forward(layer_idx, input);
   }
@@ -675,6 +684,61 @@ void LLama2Model::attention_mha(int32_t layer_idx, const tensor::Tensor& pos_ten
   STATUS_CHECK(wo_layer->forward(mha_output, attn_output));
 }
 
+void LLama2Model::attention_mha_paged(int32_t layer_idx, const tensor::Tensor& pos_tensor) const {
+  CHECK(llama_layers_ != nullptr);
+  CHECK(kv_cache_manager_ != nullptr) << "KV cache manager is null for paged attention";
+
+  tensor::Tensor mha_output = get_buffer(ModelBufferType::kOutputMHA);
+  tensor::Tensor query = this->get_buffer(ModelBufferType::kQuery);
+
+  // Get paged KV cache tensors
+  const tensor::Tensor& kv_cache = kv_cache_manager_->kv_cache_device();
+  const tensor::Tensor& block_tables = kv_cache_manager_->block_tables_device();
+  const tensor::Tensor& context_lens = kv_cache_manager_->context_lens_device();
+
+  // Get parameters from config and kv_cache_manager
+  const int32_t num_heads = config_->head_num_;
+  const int32_t num_kv_heads = config_->kv_head_num_;
+  const int32_t head_dim = config_->head_size_;
+  const int32_t num_layers = config_->layer_num_;
+  const int32_t block_size = kv_cache_manager_->block_size();
+  const int32_t max_blocks_per_seq = kv_cache_manager_->max_blocks_per_seq();
+  // Get num_seqs from KVCacheManager instead of hardcoding
+  const int32_t num_seqs = kv_cache_manager_->num_seqs();
+  const int32_t max_context_len = kv_cache_manager_->get_context_len(0);
+
+  // Scale factor for attention: 1/sqrt(head_dim)
+  const float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+
+  // Get CUDA stream
+  cudaStream_t stream = cuda_config_ ? cuda_config_->stream : nullptr;
+
+  // Call paged attention kernel
+  kernel::paged_attention_kernel_cu(
+      mha_output,
+      query,
+      kv_cache,
+      block_tables,
+      context_lens,
+      max_context_len,
+      num_seqs,
+      num_heads,
+      num_kv_heads,
+      head_dim,
+      block_size,
+      max_blocks_per_seq,
+      scale,
+      layer_idx,
+      num_layers,
+      stream);
+
+  // wo @ attention output
+  tensor::Tensor attn_output = get_buffer(ModelBufferType::kAttnOutput);
+  const auto& wo_layer = llama_layers_->wo_layers_.at(layer_idx);
+  CHECK_NE(wo_layer, nullptr) << "The weight output layer is null pointer.";
+  STATUS_CHECK(wo_layer->forward(mha_output, attn_output));
+}
+
 void LLama2Model::feed_forward(int32_t layer_idx, const tensor::Tensor& input) const {
   CHECK(llama_layers_ != nullptr);
   // residual add
@@ -742,6 +806,524 @@ int32_t LLama2Model::post_processing(const tensor::Tensor& pos, bool is_prompt) 
                                                  cuda_config_ ? cuda_config_->stream : nullptr));
   }
   return next;
+}
+
+void LLama2Model::init_batch_buffers(int32_t num_seqs) {
+  if (num_seqs <= 1) {
+    return;  // No need for batch buffers with single sequence
+  }
+
+  std::shared_ptr<base::DeviceAllocator> alloc;
+  if (device_type_ == base::DeviceType::kDeviceCPU) {
+    alloc = base::CPUDeviceAllocatorFactory::get_instance();
+  } else {
+    alloc = base::CUDADeviceAllocatorFactory::get_instance();
+  }
+  std::shared_ptr<base::DeviceAllocator> alloc_cpu =
+      base::CPUDeviceAllocatorFactory::get_instance();
+
+  // Batch input embeddings: [num_seqs, dim]
+  tensor::Tensor batch_input(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchInputEmbeddings, batch_input));
+
+  // Batch positions: [num_seqs] on CPU (for reading), and GPU copy
+  tensor::Tensor batch_positions_cpu(base::DataType::kDataTypeInt32, num_seqs, true, alloc_cpu);
+  tensor::Tensor batch_positions_gpu(base::DataType::kDataTypeInt32, num_seqs, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchPositions, batch_positions_gpu));
+
+  // Batch RMSNorm output: [num_seqs, dim]
+  tensor::Tensor batch_rms_output(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchRMSNormOutput, batch_rms_output));
+
+  // Batch Query: [num_seqs, dim]
+  tensor::Tensor batch_query(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchQuery, batch_query));
+
+  // Batch Key: [num_seqs, kv_dim]
+  tensor::Tensor batch_key(base::DataType::kDataTypeFp32, num_seqs, config_->kv_dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchKey, batch_key));
+
+  // Batch Value: [num_seqs, kv_dim]
+  tensor::Tensor batch_value(base::DataType::kDataTypeFp32, num_seqs, config_->kv_dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchValue, batch_value));
+
+  // Batch MHA output: [num_seqs, dim]
+  tensor::Tensor batch_mha_output(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchOutputMHA, batch_mha_output));
+
+  // Batch Attention output: [num_seqs, dim]
+  tensor::Tensor batch_attn_output(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchAttnOutput, batch_attn_output));
+
+  // Batch FFN RMSNorm: [num_seqs, dim]
+  tensor::Tensor batch_ffn_rms(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchFFNRMSNorm, batch_ffn_rms));
+
+  // Batch W1 output: [num_seqs, hidden_dim]
+  tensor::Tensor batch_w1_output(base::DataType::kDataTypeFp32, num_seqs, config_->hidden_dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchW1Output, batch_w1_output));
+
+  // Batch W3 output: [num_seqs, hidden_dim]
+  tensor::Tensor batch_w3_output(base::DataType::kDataTypeFp32, num_seqs, config_->hidden_dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchW3Output, batch_w3_output));
+
+  // Batch W2 output: [num_seqs, dim]
+  tensor::Tensor batch_w2_output(base::DataType::kDataTypeFp32, num_seqs, config_->dim_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchW2Output, batch_w2_output));
+
+  // Batch forward output: [num_seqs, vocab_size] - logits for each sequence
+  tensor::Tensor batch_forward_output(base::DataType::kDataTypeFp32, num_seqs, config_->vocab_size_, true, alloc);
+  CHECK(insert_buffer(ModelBufferType::kBatchForwardOutput, batch_forward_output));
+
+  LOG(INFO) << "Initialized batch buffers for " << num_seqs << " sequences";
+}
+
+base::Status LLama2Model::forward_batch(const tensor::Tensor& inputs,
+                                        const tensor::Tensor& positions,
+                                        std::vector<int32_t>& next_tokens) const {
+  // inputs: [num_seqs, dim]
+  // positions: [num_seqs] on GPU
+  if (inputs.is_empty()) {
+    return base::error::InvalidArgument("The input tensor is empty.");
+  }
+
+  const int32_t num_seqs = kv_cache_manager_->num_seqs();
+  if (num_seqs <= 1) {
+    return base::error::InvalidArgument("forward_batch requires num_seqs > 1");
+  }
+
+  // Get batch buffers
+  tensor::Tensor batch_rms_output = get_buffer(ModelBufferType::kBatchRMSNormOutput);
+  tensor::Tensor batch_query = get_buffer(ModelBufferType::kBatchQuery);
+  tensor::Tensor batch_key = get_buffer(ModelBufferType::kBatchKey);
+  tensor::Tensor batch_value = get_buffer(ModelBufferType::kBatchValue);
+  tensor::Tensor batch_mha_output = get_buffer(ModelBufferType::kBatchOutputMHA);
+  tensor::Tensor batch_attn_output = get_buffer(ModelBufferType::kBatchAttnOutput);
+  tensor::Tensor batch_ffn_rms = get_buffer(ModelBufferType::kBatchFFNRMSNorm);
+  tensor::Tensor batch_w1_output = get_buffer(ModelBufferType::kBatchW1Output);
+  tensor::Tensor batch_w3_output = get_buffer(ModelBufferType::kBatchW3Output);
+  tensor::Tensor batch_w2_output = get_buffer(ModelBufferType::kBatchW2Output);
+
+  // Get paged KV cache tensors
+  const tensor::Tensor& kv_cache = kv_cache_manager_->kv_cache_device();
+  const tensor::Tensor& block_tables = kv_cache_manager_->block_tables_device();
+  const tensor::Tensor& context_lens = kv_cache_manager_->context_lens_device();
+
+  // Get parameters
+  const int32_t num_heads = config_->head_num_;
+  const int32_t num_kv_heads = config_->kv_head_num_;
+  const int32_t head_dim = config_->head_size_;
+  const int32_t num_layers = config_->layer_num_;
+  const int32_t block_size = kv_cache_manager_->block_size();
+  const int32_t max_blocks_per_seq = kv_cache_manager_->max_blocks_per_seq();
+  const int32_t dim = config_->dim_;
+  const int32_t kv_dim = config_->kv_dim_;
+  const float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+
+  cudaStream_t stream = cuda_config_ ? cuda_config_->stream : nullptr;
+
+  // Copy input to working buffer
+  tensor::Tensor working_input = inputs;  // [num_seqs, dim]
+
+  for (int32_t layer_idx = 0; layer_idx < num_layers; ++layer_idx) {
+    // 1. Attention RMSNorm (batch) - use dim version for batch
+    auto rmsnorm_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->rmsnorm_layers_.at(layer_idx));
+    kernel::get_rmsnorm_dim_kernel(device_type_)(working_input, rmsnorm_layer->get_weight(0),
+                                                  batch_rms_output, dim, stream);
+
+    // 2. QKV projection (batch GEMM)
+    // Q = rms_output @ Wq^T
+    auto wq_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wq_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_rms_output, wq_layer->get_weight(0),
+                                           batch_query, cuda_config_.get());
+
+    // K = rms_output @ Wk^T
+    auto wk_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wk_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_rms_output, wk_layer->get_weight(0),
+                                           batch_key, cuda_config_.get());
+
+    // V = rms_output @ Wv^T
+    auto wv_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wv_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_rms_output, wv_layer->get_weight(0),
+                                           batch_value, cuda_config_.get());
+
+    // 3. RoPE (batch)
+    kernel::get_rope_batch_kernel(device_type_)(
+        num_seqs, dim, kv_dim, head_dim,
+        batch_query, batch_key, positions,
+        get_buffer(ModelBufferType::kSinCache),
+        get_buffer(ModelBufferType::kCosCache),
+        stream);
+
+    // 4. Write K, V to paged KV cache (batch)
+    kernel::batch_kv_cache_write_cu(
+        const_cast<tensor::Tensor&>(kv_cache),
+        batch_key,
+        batch_value,
+        block_tables,
+        positions,
+        num_seqs,
+        num_kv_heads,
+        head_dim,
+        block_size,
+        max_blocks_per_seq,
+        layer_idx,
+        num_layers,
+        stream);
+
+    // 5. Paged Attention (already supports batch)
+    // Get max context len across all sequences
+    int32_t max_context_len = 0;
+    for (int32_t s = 0; s < num_seqs; ++s) {
+      int32_t ctx_len = kv_cache_manager_->get_context_len(s);
+      if (ctx_len > max_context_len) max_context_len = ctx_len;
+    }
+
+    kernel::paged_attention_kernel_cu(
+        batch_mha_output,
+        batch_query,
+        kv_cache,
+        block_tables,
+        context_lens,
+        max_context_len,
+        num_seqs,
+        num_heads,
+        num_kv_heads,
+        head_dim,
+        block_size,
+        max_blocks_per_seq,
+        scale,
+        layer_idx,
+        num_layers,
+        stream);
+
+    // 6. Output projection: O = mha_output @ Wo^T
+    auto wo_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wo_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_mha_output, wo_layer->get_weight(0),
+                                           batch_attn_output, cuda_config_.get());
+
+    // 7. Residual add: working_input += attn_output
+    kernel::get_add_kernel(device_type_)(working_input, batch_attn_output, working_input, stream);
+
+    // 8. FFN RMSNorm
+    auto ffn_rmsnorm = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->rmsnorm_layers_.at(layer_idx + num_layers));
+    kernel::get_rmsnorm_dim_kernel(device_type_)(working_input, ffn_rmsnorm->get_weight(0),
+                                                  batch_ffn_rms, dim, stream);
+
+    // 9. FFN: W1 and W3
+    auto w1_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->w1_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_ffn_rms, w1_layer->get_weight(0),
+                                           batch_w1_output, cuda_config_.get());
+
+    auto w3_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->w3_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_ffn_rms, w3_layer->get_weight(0),
+                                           batch_w3_output, cuda_config_.get());
+
+    // 10. SwiGLU
+    kernel::get_swiglu_kernel(device_type_)(batch_w1_output, batch_w3_output, batch_w1_output, stream);
+
+    // 11. W2
+    auto w2_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->w2_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(batch_w1_output, w2_layer->get_weight(0),
+                                           batch_w2_output, cuda_config_.get());
+
+    // 12. Residual add
+    kernel::get_add_kernel(device_type_)(working_input, batch_w2_output, working_input, stream);
+  }
+
+  // Final RMSNorm
+  auto final_rmsnorm = std::dynamic_pointer_cast<op::LayerParam>(
+      llama_layers_->rmsnorm_layers_.at(2 * num_layers));
+  kernel::get_rmsnorm_dim_kernel(device_type_)(working_input, final_rmsnorm->get_weight(0),
+                                                batch_rms_output, dim, stream);
+
+  // Classification layer: logits = rms_output @ cls_weight^T
+  // Output: [num_seqs, vocab_size]
+  tensor::Tensor batch_forward_output = get_buffer(ModelBufferType::kBatchForwardOutput);
+  auto cls_layer = std::dynamic_pointer_cast<op::LayerParam>(llama_layers_->cls_layer_);
+  kernel::get_gemm_kernel(device_type_)(batch_rms_output, cls_layer->get_weight(0),
+                                         batch_forward_output, cuda_config_.get());
+
+  cudaStreamSynchronize(stream);
+
+  // Sample next token for each sequence
+  next_tokens.resize(num_seqs);
+  const int32_t vocab_size = config_->vocab_size_;
+  const float* logits_ptr = batch_forward_output.ptr<float>();
+
+  for (int32_t s = 0; s < num_seqs; ++s) {
+    const float* seq_logits = logits_ptr + s * vocab_size;
+    next_tokens[s] = static_cast<int32_t>(sampler_->sample(seq_logits, vocab_size, stream));
+  }
+
+  return base::error::Success();
+}
+
+// ============================================================================
+// Unified forward implementation
+// Supports: single decode, batch decode, chunked prefill, mixed prefill+decode
+// ============================================================================
+
+void LLama2Model::ensure_unified_buffers(int32_t num_tokens) const {
+  // Cast away const for buffer initialization (buffers are mutable cache)
+  const_cast<LLama2Model*>(this)->init_unified_buffers(num_tokens);
+}
+
+base::Status LLama2Model::forward_unified(
+    const tensor::Tensor& hidden_states,
+    const base::BatchMetadata& batch_meta,
+    std::vector<int32_t>& next_tokens) const {
+
+  if (hidden_states.is_empty()) {
+    return base::error::InvalidArgument("The hidden_states tensor is empty.");
+  }
+
+  CHECK(kv_cache_manager_ != nullptr) << "KV cache manager not initialized for unified forward";
+
+  const int32_t num_tokens = batch_meta.num_tokens;
+  const int32_t num_seqs = batch_meta.num_seqs;
+  const bool has_prefill = batch_meta.has_prefill();
+  const bool has_decode = batch_meta.has_decode();
+
+  // Ensure we have buffers for this many tokens
+  ensure_unified_buffers(num_tokens);
+
+  cudaStream_t stream = cuda_config_ ? cuda_config_->stream : nullptr;
+
+  // Get unified buffers
+  tensor::Tensor unified_rms_output = get_buffer(ModelBufferType::kUnifiedRMSNormOutput);
+  tensor::Tensor unified_query = get_buffer(ModelBufferType::kUnifiedQuery);
+  tensor::Tensor unified_key = get_buffer(ModelBufferType::kUnifiedKey);
+  tensor::Tensor unified_value = get_buffer(ModelBufferType::kUnifiedValue);
+  tensor::Tensor unified_mha_output = get_buffer(ModelBufferType::kUnifiedMHAOutput);
+  tensor::Tensor unified_attn_output = get_buffer(ModelBufferType::kUnifiedAttnOutput);
+  tensor::Tensor unified_ffn_rms = get_buffer(ModelBufferType::kUnifiedFFNRMSNorm);
+  tensor::Tensor unified_w1_output = get_buffer(ModelBufferType::kUnifiedW1Output);
+  tensor::Tensor unified_w3_output = get_buffer(ModelBufferType::kUnifiedW3Output);
+  tensor::Tensor unified_w2_output = get_buffer(ModelBufferType::kUnifiedW2Output);
+
+  // Reshape buffers for current num_tokens
+  unified_rms_output.reshape({num_tokens, config_->dim_});
+  unified_query.reshape({num_tokens, config_->dim_});
+  unified_key.reshape({num_tokens, config_->kv_dim_});
+  unified_value.reshape({num_tokens, config_->kv_dim_});
+  unified_mha_output.reshape({num_tokens, config_->dim_});
+  unified_attn_output.reshape({num_tokens, config_->dim_});
+  unified_ffn_rms.reshape({num_tokens, config_->dim_});
+  unified_w1_output.reshape({num_tokens, config_->hidden_dim_});
+  unified_w3_output.reshape({num_tokens, config_->hidden_dim_});
+  unified_w2_output.reshape({num_tokens, config_->dim_});
+
+  // Get paged KV cache tensors
+  const tensor::Tensor& kv_cache = kv_cache_manager_->kv_cache_device();
+  const tensor::Tensor& block_tables = kv_cache_manager_->block_tables_device();
+  const tensor::Tensor& context_lens = kv_cache_manager_->context_lens_device();
+
+  // Get parameters
+  const int32_t num_heads = config_->head_num_;
+  const int32_t num_kv_heads = config_->kv_head_num_;
+  const int32_t head_dim = config_->head_size_;
+  const int32_t num_layers = config_->layer_num_;
+  const int32_t block_size = kv_cache_manager_->block_size();
+  const int32_t max_blocks_per_seq = kv_cache_manager_->max_blocks_per_seq();
+  const int32_t dim = config_->dim_;
+  const int32_t kv_dim = config_->kv_dim_;
+  const float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+
+  // Working tensor - copy of hidden_states that we modify in-place
+  tensor::Tensor working_input = hidden_states;  // [num_tokens, dim]
+
+  for (int32_t layer_idx = 0; layer_idx < num_layers; ++layer_idx) {
+    // 1. Attention RMSNorm: [num_tokens, dim] -> [num_tokens, dim]
+    auto rmsnorm_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->rmsnorm_layers_.at(layer_idx));
+    kernel::get_rmsnorm_dim_kernel(device_type_)(
+        working_input, rmsnorm_layer->get_weight(0), unified_rms_output, dim, stream);
+
+    // 2. QKV Projection using GEMM
+    auto wq_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wq_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_rms_output, wq_layer->get_weight(0), unified_query, cuda_config_.get());
+
+    auto wk_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wk_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_rms_output, wk_layer->get_weight(0), unified_key, cuda_config_.get());
+
+    auto wv_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wv_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_rms_output, wv_layer->get_weight(0), unified_value, cuda_config_.get());
+
+    // 3. RoPE: Apply rotary position embeddings
+    kernel::get_rope_batch_kernel(device_type_)(
+        num_tokens, dim, kv_dim, head_dim,
+        unified_query, unified_key, batch_meta.positions,
+        get_buffer(ModelBufferType::kSinCache),
+        get_buffer(ModelBufferType::kCosCache),
+        stream);
+
+    // 4. Write K, V to paged KV cache using v2 kernel with seq_ids
+    kernel::batch_kv_cache_write_v2_cu(
+        const_cast<tensor::Tensor&>(kv_cache),
+        unified_key,
+        unified_value,
+        block_tables,
+        batch_meta.positions,
+        batch_meta.seq_ids,
+        num_tokens,
+        num_kv_heads,
+        head_dim,
+        block_size,
+        max_blocks_per_seq,
+        layer_idx,
+        num_layers,
+        stream);
+
+    // 5. Attention: Choose kernel based on scenario
+    int32_t max_context_len = batch_meta.max_context_len();
+
+    if (has_prefill) {
+      // Use prefill and decode mixed kernel 
+      kernel::paged_attention_prefill_cu(
+          unified_mha_output,
+          unified_query,
+          kv_cache,
+          block_tables,
+          context_lens,
+          batch_meta.seq_ids,
+          batch_meta.positions,
+          num_tokens,
+          num_seqs,
+          num_heads,
+          num_kv_heads,
+          head_dim,
+          block_size,
+          max_blocks_per_seq,
+          scale,
+          layer_idx,
+          num_layers,
+          stream);
+    } else {
+      // Pure decode: use standard paged attention kernel
+      kernel::paged_attention_kernel_cu(
+          unified_mha_output,
+          unified_query,
+          kv_cache,
+          block_tables,
+          context_lens,
+          max_context_len,
+          num_seqs,
+          num_heads,
+          num_kv_heads,
+          head_dim,
+          block_size,
+          max_blocks_per_seq,
+          scale,
+          layer_idx,
+          num_layers,
+          stream);
+    }
+
+    // 6. Output projection: O = mha_output @ Wo^T
+    auto wo_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->wo_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_mha_output, wo_layer->get_weight(0), unified_attn_output, cuda_config_.get());
+
+    // 7. Residual add: working_input += attn_output
+    kernel::get_add_kernel(device_type_)(working_input, unified_attn_output, working_input, stream);
+
+    // 8. FFN RMSNorm
+    auto ffn_rmsnorm = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->rmsnorm_layers_.at(layer_idx + num_layers));
+    kernel::get_rmsnorm_dim_kernel(device_type_)(
+        working_input, ffn_rmsnorm->get_weight(0), unified_ffn_rms, dim, stream);
+
+    // 9. FFN: W1 and W3
+    auto w1_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->w1_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_ffn_rms, w1_layer->get_weight(0), unified_w1_output, cuda_config_.get());
+
+    auto w3_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->w3_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_ffn_rms, w3_layer->get_weight(0), unified_w3_output, cuda_config_.get());
+
+    // 10. SwiGLU
+    kernel::get_swiglu_kernel(device_type_)(unified_w1_output, unified_w3_output, unified_w1_output, stream);
+
+    // 11. W2
+    auto w2_layer = std::dynamic_pointer_cast<op::LayerParam>(
+        llama_layers_->w2_layers_.at(layer_idx));
+    kernel::get_gemm_kernel(device_type_)(
+        unified_w1_output, w2_layer->get_weight(0), unified_w2_output, cuda_config_.get());
+
+    // 12. Residual add
+    kernel::get_add_kernel(device_type_)(working_input, unified_w2_output, working_input, stream);
+  }
+
+  // Final RMSNorm
+  auto final_rmsnorm = std::dynamic_pointer_cast<op::LayerParam>(
+      llama_layers_->rmsnorm_layers_.at(2 * num_layers));
+  kernel::get_rmsnorm_dim_kernel(device_type_)(
+      working_input, final_rmsnorm->get_weight(0), unified_rms_output, dim, stream);
+
+  // Get last token indices for each sequence (for logits computation)
+  std::vector<int32_t> last_token_indices = batch_meta.get_last_token_indices();
+
+  // Compute logits only for the last token of each sequence
+  // For efficiency, we extract last tokens and do a smaller GEMM
+  next_tokens.resize(num_seqs);
+  auto cls_layer = std::dynamic_pointer_cast<op::LayerParam>(llama_layers_->cls_layer_);
+  const int32_t vocab_size = config_->vocab_size_;
+
+  // Allocate temporary buffer for last token hidden states and logits
+  std::shared_ptr<base::DeviceAllocator> alloc;
+  if (device_type_ == base::DeviceType::kDeviceCUDA) {
+    alloc = base::CUDADeviceAllocatorFactory::get_instance();
+  } else {
+    alloc = base::CPUDeviceAllocatorFactory::get_instance();
+  }
+
+  tensor::Tensor last_hidden(base::DataType::kDataTypeFp32, num_seqs, dim, true, alloc);
+  tensor::Tensor logits(base::DataType::kDataTypeFp32, num_seqs, vocab_size, true, alloc);
+
+  // Copy last token hidden states
+  for (int32_t s = 0; s < num_seqs; ++s) {
+    int32_t last_idx = last_token_indices[s];
+    cudaMemcpyAsync(
+        last_hidden.ptr<float>(s * dim),
+        unified_rms_output.ptr<float>(last_idx * dim),
+        dim * sizeof(float),
+        cudaMemcpyDeviceToDevice,
+        stream);
+  }
+
+  // Compute logits: [num_seqs, dim] @ [vocab_size, dim]^T -> [num_seqs, vocab_size]
+  kernel::get_gemm_kernel(device_type_)(last_hidden, cls_layer->get_weight(0), logits, cuda_config_.get());
+
+  cudaStreamSynchronize(stream);
+
+  // Sample next token for each sequence
+  const float* logits_ptr = logits.ptr<float>();
+  for (int32_t s = 0; s < num_seqs; ++s) {
+    const float* seq_logits = logits_ptr + s * vocab_size;
+    next_tokens[s] = static_cast<int32_t>(sampler_->sample(seq_logits, vocab_size, stream));
+  }
+
+  return base::error::Success();
 }
 
 }  // namespace model
