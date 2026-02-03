@@ -11,6 +11,7 @@
 #include "cpu/swiglu_kernel.h"
 #include "cuda/add_kernel.cuh"
 #include "cuda/emb_kernel.cuh"
+#include "cuda/gemm_kernel.cuh"
 #include "cuda/matmul_kernel.cuh"
 #include "cuda/mha_kernel.cuh"
 #include "cuda/rmsnorm_kernel.cuh"
@@ -82,6 +83,15 @@ RoPEKernel get_rope_kernel(base::DeviceType device_type) {
   }
 }
 
+RoPEBatchKernel get_rope_batch_kernel(base::DeviceType device_type) {
+  if (device_type == base::DeviceType::kDeviceCUDA) {
+    return rope_kernel_batch_cu;
+  } else {
+    LOG(FATAL) << "Batched RoPE kernel is only supported on CUDA device.";
+    return nullptr;
+  }
+}
+
 ScaleKernel get_scale_kernel(base::DeviceType device_type) {
   if (device_type == base::DeviceType::kDeviceCPU) {
     return scale_inplace_cpu;
@@ -136,6 +146,24 @@ ScaleSumKernel get_scale_sum_kernel(base::DeviceType device_type) {
     return scale_sum_kernel_cpu;
   } else {
     LOG(FATAL) << "Unknown device type for get a scale and reduce kernel.";
+    return nullptr;
+  }
+}
+
+GemmKernel get_gemm_kernel(base::DeviceType device_type) {
+  if (device_type == base::DeviceType::kDeviceCUDA) {
+    return gemm_kernel_cu;
+  } else {
+    LOG(FATAL) << "GEMM kernel is only supported on CUDA device.";
+    return nullptr;
+  }
+}
+
+GemvBatchedKernel get_gemv_batched_kernel(base::DeviceType device_type) {
+  if (device_type == base::DeviceType::kDeviceCUDA) {
+    return gemv_batched_kernel_cu;
+  } else {
+    LOG(FATAL) << "Batched GEMV kernel is only supported on CUDA device.";
     return nullptr;
   }
 }

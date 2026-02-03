@@ -168,4 +168,132 @@ void rope_kernel_cu(int32_t dim, int32_t kv_dim, int32_t head_size, const tensor
                                              cos_cache.ptr<float>());
   }
 }
+
+// ============================================================================
+// Batched RoPE Kernel for multi-token processing
+// ============================================================================
+// Grid: (num_tokens)
+// Block: processes one token's Q and K vectors
+
+#if defined(LLAMA3_SUPPORT) || defined(QWEN2_SUPPORT) || defined(QWEN3_SUPPORT)
+__global__ void rope_kernel_batch_cu_fp32(
+    int num_tokens, int dim, int kv_dim, int head_size,
+    float* input_q,           // [num_tokens, dim]
+    float* input_k,           // [num_tokens, kv_dim]
+    const int* positions,     // [num_tokens]
+    const float* sin_cache,   // [max_seq_len, head_size]
+    const float* cos_cache) {
+
+  int token_idx = blockIdx.x;
+  int tid = threadIdx.x;
+
+  if (token_idx >= num_tokens) return;
+
+  int pos = positions[token_idx];
+
+  int num_heads = dim / head_size;
+  int head_pair_count = head_size / 2;
+  int total_pairs = num_heads * head_pair_count;
+
+  // Each thread handles one (head, pair) combination
+  for (int idx = tid; idx < total_pairs; idx += blockDim.x) {
+    int head_idx = idx / head_pair_count;
+    int head_dim = idx % head_pair_count;
+
+    int i = head_idx * head_size;
+    int v0_idx = i + head_dim;
+    int v1_idx = i + head_dim + head_size / 2;
+
+    float fci = sin_cache[pos * head_size + head_dim * 2];
+    float fcr = cos_cache[pos * head_size + head_dim * 2];
+
+    int rotn = i < kv_dim ? 2 : 1;
+
+    for (int v = 0; v < rotn; v++) {
+      float* vec = (v == 0) ? (input_q + token_idx * dim) : (input_k + token_idx * kv_dim);
+      float v0 = vec[v0_idx];
+      float v1 = vec[v1_idx];
+      vec[v0_idx] = fcr * v0 - fci * v1;
+      vec[v1_idx] = fcr * v1 + fci * v0;
+    }
+  }
+}
+#else
+// LLama2 version
+__global__ void rope_kernel_batch_cu_fp32(
+    int num_tokens, int dim, int kv_dim, int head_size,
+    float* input_q,           // [num_tokens, dim]
+    float* input_k,           // [num_tokens, kv_dim]
+    const int* positions,     // [num_tokens]
+    const float* sin_cache,   // [max_seq_len, head_size]
+    const float* cos_cache) {
+
+  int token_idx = blockIdx.x;
+  int tid = threadIdx.x;
+
+  if (token_idx >= num_tokens) return;
+
+  int pos = positions[token_idx];
+  float* q_ptr = input_q + token_idx * dim;
+  float* k_ptr = input_k + token_idx * kv_dim;
+
+  // Process Q vector
+  for (int idx = tid * 2; idx < dim; idx += blockDim.x * 2) {
+    int head_dim = idx % head_size;
+    float fci = sin_cache[pos * head_size + head_dim];
+    float fcr = cos_cache[pos * head_size + head_dim];
+
+    float2* vec_ptr = reinterpret_cast<float2*>(q_ptr + idx);
+    float2 vec_value = *vec_ptr;
+    *vec_ptr = make_float2(vec_value.x * fcr - vec_value.y * fci,
+                           vec_value.x * fci + vec_value.y * fcr);
+  }
+
+  // Process K vector
+  for (int idx = tid * 2; idx < kv_dim; idx += blockDim.x * 2) {
+    int head_dim = idx % head_size;
+    float fci = sin_cache[pos * head_size + head_dim];
+    float fcr = cos_cache[pos * head_size + head_dim];
+
+    float2* vec_ptr = reinterpret_cast<float2*>(k_ptr + idx);
+    float2 vec_value = *vec_ptr;
+    *vec_ptr = make_float2(vec_value.x * fcr - vec_value.y * fci,
+                           vec_value.x * fci + vec_value.y * fcr);
+  }
+}
+#endif
+
+void rope_kernel_batch_cu(int32_t num_tokens, int32_t dim, int32_t kv_dim, int32_t head_size,
+                          const tensor::Tensor& input_q, const tensor::Tensor& input_k,
+                          const tensor::Tensor& positions, const tensor::Tensor& sin_cache,
+                          const tensor::Tensor& cos_cache, void* stream) {
+  CHECK(!input_q.is_empty());
+  CHECK(!input_k.is_empty());
+  CHECK(!positions.is_empty());
+  CHECK(!sin_cache.is_empty());
+  CHECK(!cos_cache.is_empty());
+
+  int threads = 128;
+  int blocks = num_tokens;  // One block per token
+
+  if (stream) {
+    cudaStream_t stream_ = static_cast<cudaStream_t>(stream);
+    rope_kernel_batch_cu_fp32<<<blocks, threads, 0, stream_>>>(
+        num_tokens, dim, kv_dim, head_size,
+        const_cast<float*>(input_q.ptr<float>()),
+        const_cast<float*>(input_k.ptr<float>()),
+        positions.ptr<int>(),
+        sin_cache.ptr<float>(),
+        cos_cache.ptr<float>());
+  } else {
+    rope_kernel_batch_cu_fp32<<<blocks, threads>>>(
+        num_tokens, dim, kv_dim, head_size,
+        const_cast<float*>(input_q.ptr<float>()),
+        const_cast<float*>(input_k.ptr<float>()),
+        positions.ptr<int>(),
+        sin_cache.ptr<float>(),
+        cos_cache.ptr<float>());
+  }
+}
+
 }  // namespace kernel
